@@ -502,13 +502,20 @@ class Storage:
             json.dump(table.to_dict(), f, indent=2)
     
     def _save_table_data(self, table_name: str):
-        """Save table data to disk"""
+        """Save table data to disk with atomic write"""
         data_file = self.data_dir / f"{table_name}.data.json"
-        with open(data_file, 'w') as f:
+        temp_file = self.data_dir / f"{table_name}.data.json.tmp"
+        
+        # Write to temporary file first
+        with open(temp_file, 'w') as f:
             json.dump({
                 'rows': self.data[table_name],
                 'next_row_id': self.next_row_ids[table_name]
             }, f, indent=2, default=str)
+        
+        # Atomic rename - prevents corruption if power fails mid-write
+        import os
+        os.replace(temp_file, data_file)
     
     def _load_all_tables(self):
         """Load all tables from disk"""
@@ -553,3 +560,31 @@ class Storage:
     def list_tables(self) -> List[str]:
         """List all tables"""
         return list(self.tables.keys())
+    
+    def get_system_tables_info(self) -> List[Dict[str, Any]]:
+        """Get metadata about all tables (virtual sys_tables)"""
+        result = []
+        for table_name, table in self.tables.items():
+            result.append({
+                'table_name': table_name,
+                'column_count': len(table.columns),
+                'row_count': len(self.data.get(table_name, [])),
+                'has_primary_key': table.primary_key is not None,
+                'primary_key': table.primary_key,
+                'created_at': table.created_at.isoformat()
+            })
+        return result
+    
+    def get_system_indexes_info(self) -> List[Dict[str, Any]]:
+        """Get metadata about all indexes (virtual sys_indexes)"""
+        result = []
+        for table_name, index_mgr in self.indexes.items():
+            for col_name, btree in index_mgr.indexes.items():
+                result.append({
+                    'table_name': table_name,
+                    'column_name': col_name,
+                    'index_type': 'B-Tree',
+                    'is_unique': col_name in self.tables[table_name].unique_columns or col_name == self.tables[table_name].primary_key
+                })
+        return result
+

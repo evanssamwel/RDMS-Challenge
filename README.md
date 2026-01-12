@@ -248,13 +248,15 @@ python -m pytest tests/ -v
 
 1. **JSON Storage**: Chosen for readability and debugging ease. In production, binary formats would be more efficient.
 
-2. **B-tree Max Keys**: Set to 4 for demonstration purposes. Production systems typically use higher values (100+).
+2. **Atomic Writes**: Uses temporary file + `os.replace()` for atomic writes. Writes data to `.tmp` file first, then atomically renames it. This prevents data corruption if power fails mid-write, ensuring ACID durability.
 
-3. **No Transaction Log**: Current implementation doesn't support crash recovery. Could be added with write-ahead logging.
+3. **B-tree Max Keys**: Set to 4 for demonstration purposes. Production systems typically use higher values (100+).
 
-4. **In-Memory Caching**: All data loaded into memory on startup for performance. Larger datasets would require pagination.
+4. **In-Memory Caching**: All data loaded into memory on startup for performance. Trade-off: faster queries but limited by available RAM. Larger datasets would require pagination or memory-mapped files.
 
 5. **Simple JOIN Algorithm**: Nested loop joins are easy to understand. Hash joins would be more efficient for large datasets.
+
+6. **Virtual System Tables**: Implemented `.sys_tables` and `.sys_indexes` commands to query metadata, similar to MySQL's `information_schema` or PostgreSQL's `pg_catalog`.
 
 ## 🔮 Future Enhancements
 
@@ -277,6 +279,25 @@ python -m pytest tests/ -v
 - **Flask**: Web application framework
 - **JSON**: Data persistence format
 - **HTML/CSS**: Frontend interface
+
+## 🤖 AI Attribution
+
+In compliance with challenge requirements, AI assistance was used in the following areas:
+
+**Code Generation:**
+- Initial boilerplate structure for Flask routes and HTML templates
+- Regex patterns for SQL parser (manually refined for nested logic and edge cases)
+- Test case scaffolding (test logic and assertions written manually)
+
+**Documentation:**
+- Grammar and formatting improvements for README sections
+- Docstring templates (content and technical details added manually)
+
+**Problem Solving:**
+- Discussion of B-tree algorithm approaches (implementation done manually)
+- Debugging assistance for JOIN parsing edge cases
+
+All core logic, algorithms, and architectural decisions were implemented manually. The RDBMS engine, parser, indexing system, and query execution are original implementations.
 
 ## 📝 Acknowledgments
 

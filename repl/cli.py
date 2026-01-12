@@ -73,6 +73,8 @@ class REPL:
         print("  .tables  - List all tables")
         print("  .schema <table> - Show table schema")
         print("  .explain <query> - Show query execution plan")
+        print("  .sys_tables - Show system metadata for all tables")
+        print("  .sys_indexes - Show all indexes")
         print("  .exit or .quit - Exit the REPL")
         print("=" * 60)
         print()
@@ -150,6 +152,33 @@ class REPL:
                 print("Usage: .explain <SQL query>")
                 return
             self._explain_query(sql)
+        
+        elif cmd == '.sys_tables':
+            tables_info = self.storage.get_system_tables_info()
+            if tables_info:
+                print("\nSystem Tables Metadata:")
+                print("-" * 80)
+                for info in tables_info:
+                    print(f"Table: {info['table_name']}")
+                    print(f"  Columns: {info['column_count']}")
+                    print(f"  Rows: {info['row_count']}")
+                    print(f"  Primary Key: {info['primary_key'] or 'None'}")
+                    print(f"  Created: {info['created_at']}")
+                    print()
+            else:
+                print("\nNo tables found\n")
+        
+        elif cmd == '.sys_indexes':
+            indexes_info = self.storage.get_system_indexes_info()
+            if indexes_info:
+                print("\nSystem Indexes Metadata:")
+                print("-" * 80)
+                for info in indexes_info:
+                    unique_str = " (UNIQUE)" if info['is_unique'] else ""
+                    print(f"{info['table_name']}.{info['column_name']}: {info['index_type']}{unique_str}")
+                print()
+            else:
+                print("\nNo indexes found\n")
         
         else:
             print(f"Unknown command: {cmd}")
