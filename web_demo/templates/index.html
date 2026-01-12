@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SimpleSQLDB - Student Management System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <nav>
+        <div class="container">
+            <h1>SimpleSQLDB Demo</h1>
+            <ul>
+                <li><a href="{{ url_for('index') }}">Home</a></li>
+                <li><a href="{{ url_for('students') }}">Students</a></li>
+                <li><a href="{{ url_for('courses') }}">Courses</a></li>
+                <li><a href="{{ url_for('enrollments') }}">Enrollments</a></li>
+                <li><a href="{{ url_for('sql_console') }}">SQL Console</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="hero">
+            <h2>Welcome to SimpleSQLDB</h2>
+            <p>A simple relational database management system built from scratch in Python.</p>
+            
+            <div class="features">
+                <div class="feature-card">
+                    <h3>📊 SQL Support</h3>
+                    <p>Full SQL parser with CREATE TABLE, INSERT, SELECT, UPDATE, DELETE</p>
+                </div>
+                
+                <div class="feature-card">
+                    <h3>🔗 JOIN Operations</h3>
+                    <p>INNER JOIN and LEFT JOIN support for complex queries</p>
+                </div>
+                
+                <div class="feature-card">
+                    <h3>🚀 Indexing</h3>
+                    <p>B-tree indexing for fast lookups on primary and unique keys</p>
+                </div>
+                
+                <div class="feature-card">
+                    <h3>💾 Persistence</h3>
+                    <p>Data persisted to disk with JSON-based storage</p>
+                </div>
+            </div>
+
+            <div class="demo-info">
+                <h3>Student Management System Demo</h3>
+                <p>This demo showcases all CRUD operations:</p>
+                <ul>
+                    <li><strong>Create:</strong> Add new students, courses, and enrollments</li>
+                    <li><strong>Read:</strong> View and search records with SQL queries</li>
+                    <li><strong>Update:</strong> Edit student information</li>
+                    <li><strong>Delete:</strong> Remove records from the database</li>
+                    <li><strong>JOINs:</strong> View enrollments with student and course details</li>
+                </ul>
+                
+                <div class="button-group">
+                    <a href="{{ url_for('students') }}" class="btn btn-primary">Manage Students</a>
+                    <a href="{{ url_for('courses') }}" class="btn btn-secondary">Manage Courses</a>
+                    <a href="{{ url_for('sql_console') }}" class="btn btn-accent">SQL Console</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>SimpleSQLDB - Pesapal Junior Dev Challenge 2026</p>
+        </div>
+    </footer>
+</body>
+</html>

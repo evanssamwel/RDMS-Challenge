@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enrollments - SimpleSQLDB</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <nav>
+        <div class="container">
+            <h1>SimpleSQLDB Demo</h1>
+            <ul>
+                <li><a href="{{ url_for('index') }}">Home</a></li>
+                <li><a href="{{ url_for('students') }}">Students</a></li>
+                <li><a href="{{ url_for('courses') }}">Courses</a></li>
+                <li><a href="{{ url_for('enrollments') }}" class="active">Enrollments</a></li>
+                <li><a href="{{ url_for('sql_console') }}">SQL Console</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="page-header">
+            <h2>Enrollments (with JOINs)</h2>
+            <a href="{{ url_for('add_enrollment') }}" class="btn btn-primary">Add Enrollment</a>
+        </div>
+
+        {% if error %}
+        <div class="alert alert-error">{{ error }}</div>
+        {% endif %}
+
+        <div class="info-box">
+            <p>This page demonstrates <strong>INNER JOIN</strong> operations, combining data from students, courses, and enrollments tables.</p>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Student Name</th>
+                    <th>Student Email</th>
+                    <th>Course Name</th>
+                    <th>Course Code</th>
+                    <th>Grade</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for enrollment in enrollments %}
+                <tr>
+                    <td>{{ enrollment.student_name }}</td>
+                    <td>{{ enrollment.student_email }}</td>
+                    <td>{{ enrollment.course_name }}</td>
+                    <td>{{ enrollment.course_code }}</td>
+                    <td>{{ enrollment.grade }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" style="text-align: center;">No enrollments found</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

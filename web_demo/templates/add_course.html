@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Course - SimpleSQLDB</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <nav>
+        <div class="container">
+            <h1>SimpleSQLDB Demo</h1>
+            <ul>
+                <li><a href="{{ url_for('index') }}">Home</a></li>
+                <li><a href="{{ url_for('students') }}">Students</a></li>
+                <li><a href="{{ url_for('courses') }}" class="active">Courses</a></li>
+                <li><a href="{{ url_for('enrollments') }}">Enrollments</a></li>
+                <li><a href="{{ url_for('sql_console') }}">SQL Console</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="page-header">
+            <h2>Add Course</h2>
+            <a href="{{ url_for('courses') }}" class="btn btn-secondary">Back to Courses</a>
+        </div>
+
+        {% if error %}
+        <div class="alert alert-error">{{ error }}</div>
+        {% endif %}
+
+        <form method="POST" class="form">
+            <div class="form-group">
+                <label for="id">ID:</label>
+                <input type="number" id="id" name="id" required>
+            </div>
+
+            <div class="form-group">
+                <label for="name">Name:</label>
+                <input type="text" id="name" name="name" required>
+            </div>
+
+            <div class="form-group">
+                <label for="code">Code:</label>
+                <input type="text" id="code" name="code" required>
+            </div>
+
+            <div class="form-group">
+                <label for="credits">Credits:</label>
+                <input type="number" id="credits" name="credits" required>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Add Course</button>
+        </form>
+    </div>
+</body>
+</html>
