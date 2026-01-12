@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SimpleSQLDB - Database Management Studio</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .code-editor {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+        
+        /* Animations */
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .animate-slide-in {
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        /* Custom colors */
+        .bg-brand {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        }
+        
+        .accent-emerald {
+            color: #10b981;
+        }
+        
+        .accent-rose {
+            color: #f43f5e;
+        }
+    </style>
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            dark: '#0f172a',
+                            light: '#1e293b',
+                        },
+                        accent: {
+                            emerald: '#10b981',
+                            rose: '#f43f5e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-900 text-gray-100" x-data="dashboardApp()">
+    <!-- Main Container -->
+    <div class="flex h-screen overflow-hidden">
+        
+        <!-- Sidebar -->
+        <aside class="w-64 bg-brand flex-shrink-0 border-r border-slate-700">
+            <div class="p-6">
+                <div class="flex items-center space-x-3 mb-8">
+                    <div class="w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center">
+                        <i data-lucide="database" class="w-6 h-6 text-white"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold">SimpleSQLDB</h1>
+                        <p class="text-xs text-gray-400">Management Studio</p>
+                    </div>
+                </div>
+                
+                <!-- Navigation -->
+                <nav class="space-y-2">
+                    <button @click="activeView = 'explorer'" 
+                            :class="activeView === 'explorer' ? 'bg-slate-700 text-white' : 'text-gray-400 hover:bg-slate-800'"
+                            class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition">
+                        <i data-lucide="folder-tree" class="w-5 h-5"></i>
+                        <span>Schema Explorer</span>
+                    </button>
+                    
+                    <button @click="activeView = 'console'" 
+                            :class="activeView === 'console' ? 'bg-slate-700 text-white' : 'text-gray-400 hover:bg-slate-800'"
+                            class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition">
+                        <i data-lucide="terminal" class="w-5 h-5"></i>
+                        <span>SQL Console</span>
+                    </button>
+                    
+                    <button @click="activeView = 'erd'" 
+                            :class="activeView === 'erd' ? 'bg-slate-700 text-white' : 'text-gray-400 hover:bg-slate-800'"
+                            class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition">
+                        <i data-lucide="git-branch" class="w-5 h-5"></i>
+                        <span>Schema Diagram</span>
+                    </button>
+                    
+                    <button @click="activeView = 'indexes'" 
+                            :class="activeView === 'indexes' ? 'bg-slate-700 text-white' : 'text-gray-400 hover:bg-slate-800'"
+                            class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition">
+                        <i data-lucide="zap" class="w-5 h-5"></i>
+                        <span>Indexes</span>
+                    </button>
+                </nav>
+                
+                <!-- Tables List -->
+                <div class="mt-8">
+                    <h3 class="text-sm font-semibold text-gray-400 mb-3 px-4">TABLES</h3>
+                    <div class="space-y-1">
+                        <template x-for="table in tables" :key="table.table_name">
+                            <button @click="selectTable(table.table_name)" 
+                                    :class="selectedTable === table.table_name ? 'bg-emerald-500/10 text-emerald-400 border-l-2 border-emerald-500' : 'text-gray-400 hover:bg-slate-800'"
+                                    class="w-full flex items-center justify-between px-4 py-2 text-sm transition">
+                                <span class="flex items-center space-x-2">
+                                    <i data-lucide="table" class="w-4 h-4"></i>
+                                    <span x-text="table.table_name"></span>
+                                </span>
+                                <span class="text-xs text-gray-500" x-text="table.row_count"></span>
+                            </button>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </aside>
+        
+        <!-- Main Content -->
+        <main class="flex-1 overflow-hidden flex flex-col">
+            
+            <!-- Header -->
+            <header class="bg-slate-800/50 border-b border-slate-700 px-6 py-4 flex items-center justify-between">
+                <div>
+                    <h2 class="text-2xl font-semibold" x-text="getViewTitle()"></h2>
+                    <p class="text-sm text-gray-400 mt-1" x-text="getViewDescription()"></p>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="text-sm text-gray-400">
+                        <span x-text="tables.length"></span> tables • 
+                        <span x-text="totalRows"></span> rows
+                    </div>
+                    <button @click="refreshData()" class="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg transition flex items-center space-x-2">
+                        <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                        <span>Refresh</span>
+                    </button>
+                </div>
+            </header>
+            
+            <!-- Content Area -->
+            <div class="flex-1 overflow-auto p-6">
+                
+                <!-- Schema Explorer View -->
+                <div x-show="activeView === 'explorer'" class="space-y-6">
+                    <!-- Table Data -->
+                    <div x-show="selectedTable" class="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
+                        <div class="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+                            <h3 class="font-semibold flex items-center space-x-2">
+                                <i data-lucide="table" class="w-5 h-5 text-emerald-500"></i>
+                                <span x-text="selectedTable"></span>
+                            </h3>
+                            <div class="flex space-x-2">
+                                <button @click="showSchemaModal = true" class="px-3 py-1 text-sm bg-slate-700 hover:bg-slate-600 rounded transition">
+                                    <i data-lucide="info" class="w-4 h-4 inline mr-1"></i>
+                                    Schema
+                                </button>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead class="bg-slate-700/50">
+                                    <tr>
+                                        <template x-for="col in tableColumns" :key="col">
+                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider" x-text="col"></th>
+                                        </template>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-700">
+                                    <template x-for="(row, index) in tableData" :key="index">
+                                        <tr class="hover:bg-slate-700/30 transition">
+                                            <template x-for="col in tableColumns" :key="col">
+                                                <td class="px-6 py-4 text-sm" x-text="row[col]"></td>
+                                            </template>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- SQL Console View -->
+                <div x-show="activeView === 'console'" class="space-y-4">
+                    <!-- SQL Editor -->
+                    <div class="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
+                        <div class="px-6 py-3 bg-slate-700/50 border-b border-slate-700 flex items-center justify-between">
+                            <h3 class="font-semibold text-sm">SQL Query Editor</h3>
+                            <div class="flex space-x-2">
+                                <button @click="activeTab = 'query'" :class="activeTab === 'query' ? 'bg-slate-600' : 'bg-transparent'" class="px-3 py-1 text-xs rounded transition">Query</button>
+                                <button @click="activeTab = 'results'" :class="activeTab === 'results' ? 'bg-slate-600' : 'bg-transparent'" class="px-3 py-1 text-xs rounded transition">Results</button>
+                                <button @click="activeTab = 'explain'" :class="activeTab === 'explain' ? 'bg-slate-600' : 'bg-transparent'" class="px-3 py-1 text-xs rounded transition">Explain</button>
+                            </div>
+                        </div>
+                        
+                        <!-- Query Tab -->
+                        <div x-show="activeTab === 'query'" class="p-6">
+                            <textarea x-model="sqlQuery" 
+                                      class="w-full h-48 bg-slate-900 text-gray-100 rounded-lg p-4 code-editor border border-slate-600 focus:border-emerald-500 focus:outline-none resize-none"
+                                      placeholder="Enter your SQL query here...&#10;&#10;Examples:&#10;SELECT * FROM employees;&#10;SELECT dept_id, COUNT(*) FROM employees GROUP BY dept_id;"></textarea>
+                            <div class="mt-4 flex space-x-3">
+                                <button @click="executeQuery()" class="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 rounded-lg transition flex items-center space-x-2">
+                                    <i data-lucide="play" class="w-4 h-4"></i>
+                                    <span>Execute</span>
+                                </button>
+                                <button @click="explainQuery()" class="px-6 py-3 bg-blue-500 hover:bg-blue-600 rounded-lg transition flex items-center space-x-2">
+                                    <i data-lucide="info" class="w-4 h-4"></i>
+                                    <span>Explain</span>
+                                </button>
+                                <button @click="sqlQuery = ''" class="px-6 py-3 bg-slate-700 hover:bg-slate-600 rounded-lg transition">
+                                    Clear
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Results Tab -->
+                        <div x-show="activeTab === 'results'" class="p-6">
+                            <div x-show="queryResults.success === false" class="bg-rose-500/10 border border-rose-500 rounded-lg p-4 mb-4">
+                                <div class="flex items-start space-x-3">
+                                    <i data-lucide="alert-circle" class="w-5 h-5 text-rose-500 mt-0.5"></i>
+                                    <div>
+                                        <h4 class="font-semibold text-rose-500">Error</h4>
+                                        <p class="text-sm text-gray-300 mt-1" x-text="queryResults.error"></p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div x-show="queryResults.success === true && queryResults.type === 'SELECT'" class="space-y-4">
+                                <div class="flex items-center justify-between">
+                                    <p class="text-sm text-gray-400">
+                                        <span x-text="queryResults.count"></span> rows returned
+                                    </p>
+                                    <button x-show="canVisualize" @click="visualizeResults()" class="px-3 py-1 text-sm bg-blue-500 hover:bg-blue-600 rounded transition">
+                                        <i data-lucide="bar-chart-3" class="w-4 h-4 inline mr-1"></i>
+                                        Visualize
+                                    </button>
+                                </div>
+                                <div class="overflow-x-auto bg-slate-900 rounded-lg border border-slate-700">
+                                    <table class="w-full">
+                                        <thead class="bg-slate-700/50">
+                                            <tr>
+                                                <template x-for="col in Object.keys(queryResults.rows[0] || {})" :key="col">
+                                                    <th class="px-4 py-2 text-left text-xs font-semibold text-gray-300 uppercase" x-text="col"></th>
+                                                </template>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-slate-700">
+                                            <template x-for="(row, index) in queryResults.rows" :key="index">
+                                                <tr class="hover:bg-slate-700/30">
+                                                    <template x-for="col in Object.keys(row)" :key="col">
+                                                        <td class="px-4 py-2 text-sm" x-text="row[col]"></td>
+                                                    </template>
+                                                </tr>
+                                            </template>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <canvas x-show="showChart" id="resultsChart" class="mt-4"></canvas>
+                            </div>
+                            
+                            <div x-show="queryResults.success === true && queryResults.type === 'DDL/DML'" class="bg-emerald-500/10 border border-emerald-500 rounded-lg p-4">
+                                <div class="flex items-start space-x-3">
+                                    <i data-lucide="check-circle" class="w-5 h-5 text-emerald-500 mt-0.5"></i>
+                                    <div>
+                                        <h4 class="font-semibold text-emerald-500">Success</h4>
+                                        <p class="text-sm text-gray-300 mt-1" x-text="queryResults.message"></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Explain Tab -->
+                        <div x-show="activeTab === 'explain'" class="p-6">
+                            <div x-show="explainPlan" class="space-y-4">
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div class="bg-slate-900 rounded-lg p-4 border border-slate-700">
+                                        <h4 class="text-sm font-semibold text-gray-400 mb-2">Query Type</h4>
+                                        <p class="text-lg font-mono" x-text="explainPlan?.plan?.query_type"></p>
+                                    </div>
+                                    <div class="bg-slate-900 rounded-lg p-4 border border-slate-700">
+                                        <h4 class="text-sm font-semibold text-gray-400 mb-2">Access Method</h4>
+                                        <p class="text-lg font-mono" x-text="explainPlan?.plan?.access_method"></p>
+                                    </div>
+                                </div>
+                                
+                                <div x-show="explainPlan?.plan?.index_used" class="bg-emerald-500/10 border border-emerald-500 rounded-lg p-4">
+                                    <h4 class="text-sm font-semibold text-emerald-500 mb-2">
+                                        <i data-lucide="zap" class="w-4 h-4 inline"></i>
+                                        Index Usage
+                                    </h4>
+                                    <p class="text-sm" x-text="explainPlan?.plan?.index_used"></p>
+                                </div>
+                                
+                                <div x-show="explainPlan?.plan?.aggregates?.length > 0" class="bg-slate-900 rounded-lg p-4 border border-slate-700">
+                                    <h4 class="text-sm font-semibold text-gray-400 mb-2">Aggregates</h4>
+                                    <ul class="space-y-1">
+                                        <template x-for="agg in explainPlan?.plan?.aggregates" :key="agg.alias">
+                                            <li class="text-sm font-mono" x-text="`${agg.function}(${agg.column}) AS ${agg.alias}`"></li>
+                                        </template>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- ERD View -->
+                <div x-show="activeView === 'erd'" class="bg-slate-800 rounded-lg border border-slate-700 p-6">
+                    <div id="erdCanvas" class="w-full h-96 bg-slate-900 rounded-lg border border-slate-700 flex items-center justify-center text-gray-400">
+                        <div class="text-center">
+                            <i data-lucide="git-branch" class="w-16 h-16 mx-auto mb-4 text-emerald-500"></i>
+                            <p>Schema visualization with foreign key relationships</p>
+                            <pre class="mt-4 text-sm text-left bg-slate-800 p-4 rounded-lg inline-block" x-text="getERDText()"></pre>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Indexes View -->
+                <div x-show="activeView === 'indexes'" class="space-y-4">
+                    <template x-for="index in indexes" :key="`${index.table_name}.${index.column_name}`">
+                        <div class="bg-slate-800 rounded-lg border border-slate-700 p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center space-x-3">
+                                    <i data-lucide="zap" class="w-6 h-6 text-emerald-500"></i>
+                                    <div>
+                                        <h3 class="font-semibold" x-text="`${index.table_name}.${index.column_name}`"></h3>
+                                        <p class="text-sm text-gray-400" x-text="index.index_type"></p>
+                                    </div>
+                                </div>
+                                <span x-show="index.is_unique" class="px-3 py-1 bg-emerald-500/20 text-emerald-500 text-xs font-semibold rounded-full">
+                                    UNIQUE
+                                </span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+                
+            </div>
+        </main>
+    </div>
+    
+    <!-- Schema Modal -->
+    <div x-show="showSchemaModal" 
+         x-cloak
+         @click.away="showSchemaModal = false"
+         class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div class="bg-slate-800 rounded-lg border border-slate-700 w-full max-w-2xl max-h-[80vh] overflow-auto m-4 animate-slide-in">
+            <div class="px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+                <h3 class="font-semibold">Schema: <span x-text="selectedTable"></span></h3>
+                <button @click="showSchemaModal = false" class="text-gray-400 hover:text-white">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <div class="p-6">
+                <table class="w-full">
+                    <thead>
+                        <tr class="border-b border-slate-700">
+                            <th class="text-left py-2 text-sm font-semibold text-gray-400">Column</th>
+                            <th class="text-left py-2 text-sm font-semibold text-gray-400">Type</th>
+                            <th class="text-left py-2 text-sm font-semibold text-gray-400">Constraints</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template x-for="col in tableSchema" :key="col.name">
+                            <tr class="border-b border-slate-700/50">
+                                <td class="py-3 font-mono text-sm" x-text="col.name"></td>
+                                <td class="py-3 text-sm" x-text="col.type + (col.length ? `(${col.length})` : '')"></td>
+                                <td class="py-3 text-sm">
+                                    <div class="flex flex-wrap gap-1">
+                                        <span x-show="col.primary_key" class="px-2 py-0.5 bg-emerald-500/20 text-emerald-500 text-xs rounded">PK</span>
+                                        <span x-show="col.unique" class="px-2 py-0.5 bg-blue-500/20 text-blue-500 text-xs rounded">UNIQUE</span>
+                                        <span x-show="col.not_null" class="px-2 py-0.5 bg-yellow-500/20 text-yellow-500 text-xs rounded">NOT NULL</span>
+                                        <span x-show="col.foreign_key" class="px-2 py-0.5 bg-purple-500/20 text-purple-500 text-xs rounded">FK</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        function dashboardApp() {
+            return {
+                activeView: 'explorer',
+                activeTab: 'query',
+                tables: [],
+                selectedTable: null,
+                tableData: [],
+                tableColumns: [],
+                tableSchema: [],
+                indexes: [],
+                sqlQuery: '',
+                queryResults: {},
+                explainPlan: null,
+                showSchemaModal: false,
+                showChart: false,
+                totalRows: 0,
+                
+                async init() {
+                    await this.loadTables();
+                    await this.loadIndexes();
+                    lucide.createIcons();
+                },
+                
+                async loadTables() {
+                    const response = await fetch('/api/tables');
+                    this.tables = await response.json();
+                    this.totalRows = this.tables.reduce((sum, t) => sum + t.row_count, 0);
+                    if (this.tables.length > 0 && !this.selectedTable) {
+                        await this.selectTable(this.tables[0].table_name);
+                    }
+                },
+                
+                async loadIndexes() {
+                    const response = await fetch('/api/indexes');
+                    this.indexes = await response.json();
+                },
+                
+                async selectTable(tableName) {
+                    this.selectedTable = tableName;
+                    this.activeView = 'explorer';
+                    
+                    // Load data
+                    const dataResponse = await fetch(`/api/table/${tableName}`);
+                    const dataResult = await dataResponse.json();
+                    if (dataResult.success) {
+                        this.tableData = dataResult.data;
+                        if (this.tableData.length > 0) {
+                            this.tableColumns = Object.keys(this.tableData[0]);
+                        }
+                    }
+                    
+                    // Load schema
+                    const schemaResponse = await fetch(`/api/schema/${tableName}`);
+                    const schemaResult = await schemaResponse.json();
+                    if (schemaResult.success) {
+                        this.tableSchema = schemaResult.columns;
+                    }
+                    
+                    this.$nextTick(() => lucide.createIcons());
+                },
+                
+                async executeQuery() {
+                    const response = await fetch('/api/execute', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({sql: this.sqlQuery})
+                    });
+                    this.queryResults = await response.json();
+                    this.activeTab = 'results';
+                    this.showChart = false;
+                    
+                    // Check if we can visualize (has COUNT, SUM, AVG, etc.)
+                    this.canVisualize = this.queryResults.success && 
+                                       this.queryResults.rows &&
+                                       this.queryResults.rows.length > 0 &&
+                                       Object.keys(this.queryResults.rows[0]).some(k => 
+                                           k.includes('COUNT') || k.includes('SUM') || k.includes('AVG')
+                                       );
+                    
+                    await this.loadTables();
+                    this.$nextTick(() => lucide.createIcons());
+                },
+                
+                async explainQuery() {
+                    const response = await fetch('/api/explain', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({sql: this.sqlQuery})
+                    });
+                    this.explainPlan = await response.json();
+                    this.activeTab = 'explain';
+                    this.$nextTick(() => lucide.createIcons());
+                },
+                
+                visualizeResults() {
+                    this.showChart = true;
+                    this.$nextTick(() => {
+                        const ctx = document.getElementById('resultsChart');
+                        const rows = this.queryResults.rows;
+                        
+                        // Extract labels and data
+                        const keys = Object.keys(rows[0]);
+                        const labelKey = keys[0];
+                        const dataKey = keys.find(k => k.includes('COUNT') || k.includes('SUM') || k.includes('AVG'));
+                        
+                        new Chart(ctx, {
+                            type: 'bar',
+                            data: {
+                                labels: rows.map(r => r[labelKey]),
+                                datasets: [{
+                                    label: dataKey,
+                                    data: rows.map(r => r[dataKey]),
+                                    backgroundColor: '#10b981',
+                                    borderColor: '#059669',
+                                    borderWidth: 1
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                plugins: {
+                                    legend: {
+                                        labels: {color: '#9ca3af'}
+                                    }
+                                },
+                                scales: {
+                                    y: {
+                                        beginAtZero: true,
+                                        ticks: {color: '#9ca3af'},
+                                        grid: {color: '#374151'}
+                                    },
+                                    x: {
+                                        ticks: {color: '#9ca3af'},
+                                        grid: {color: '#374151'}
+                                    }
+                                }
+                            }
+                        });
+                    });
+                },
+                
+                async refreshData() {
+                    await this.loadTables();
+                    await this.loadIndexes();
+                    if (this.selectedTable) {
+                        await this.selectTable(this.selectedTable);
+                    }
+                },
+                
+                getViewTitle() {
+                    const titles = {
+                        'explorer': 'Schema Explorer',
+                        'console': 'SQL Console',
+                        'erd': 'Entity Relationship Diagram',
+                        'indexes': 'Index Manager'
+                    };
+                    return titles[this.activeView] || '';
+                },
+                
+                getViewDescription() {
+                    const descriptions = {
+                        'explorer': 'Browse and explore your database tables',
+                        'console': 'Execute SQL queries and view execution plans',
+                        'erd': 'Visualize table relationships and foreign keys',
+                        'indexes': 'View and manage database indexes'
+                    };
+                    return descriptions[this.activeView] || '';
+                },
+                
+                async getERDText() {
+                    const response = await fetch('/api/schema-graph');
+                    const data = await response.json();
+                    
+                    let erd = 'Entity Relationship Diagram\n\n';
+                    data.tables.forEach(table => {
+                        erd += `📊 ${table.name}\n`;
+                        table.columns.forEach(col => {
+                            const markers = [];
+                            if (col.primary_key) markers.push('🔑');
+                            if (col.foreign_key) markers.push('🔗');
+                            erd += `  ${markers.join('')} ${col.name}: ${col.type}\n`;
+                        });
+                        erd += '\n';
+                    });
+                    
+                    if (data.relationships.length > 0) {
+                        erd += 'Relationships:\n';
+                        data.relationships.forEach(rel => {
+                            erd += `  ${rel.from_table}.${rel.from_column} → ${rel.to_table}.${rel.to_column}\n`;
+                        });
+                    }
+                    
+                    return erd;
+                }
+            }
+        }
+    </script>
+</body>
+</html>

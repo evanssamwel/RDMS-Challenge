@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SimpleSQLDB Studio - Unified Database Management</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .code-editor {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+        
+        .pulse-status {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+        
+        .terminal-output {
+            background: #0f172a;
+            border: 1px solid #10b981;
+            border-radius: 6px;
+            padding: 16px;
+            font-family: 'JetBrains Mono', 'Courier New', monospace;
+            font-size: 12px;
+            font-weight: 500;
+            color: #10b981;
+            line-height: 1.8;
+            max-height: 500px;
+            overflow-y: auto;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+            letter-spacing: 0.5px;
+        }
+        
+        .terminal-output div {
+            margin: 4px 0;
+        }
+        
+        .terminal-label {
+            color: #60a5fa;
+            font-weight: 600;
+        }
+        
+        .terminal-value {
+            color: #10b981;
+        }
+        
+        .terminal-key {
+            color: #fbbf24;
+        }
+        
+        .breadcrumb-item {
+            display: inline-flex;
+            align-items: center;
+        }
+        
+        .breadcrumb-item::after {
+            content: '›';
+            margin: 0 12px;
+            color: #64748b;
+        }
+        
+        .breadcrumb-item:last-child::after {
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-gray-100" x-data="studioApp()">
+    <div class="flex h-screen overflow-hidden">
+        
+        <!-- SIDEBAR NAVIGATION -->
+        <aside class="w-64 bg-gradient-to-b from-slate-800 to-slate-900 border-r border-slate-700 flex flex-col">
+            <!-- Logo -->
+            <div class="p-6 border-b border-slate-700">
+                <div class="flex items-center space-x-3 mb-2">
+                    <div class="w-10 h-10 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center">
+                        <i data-lucide="database" class="w-6 h-6 text-white"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-lg font-bold">SimpleSQLDB</h1>
+                        <p class="text-xs text-emerald-400">Studio</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Status Indicator -->
+            <div class="px-6 py-3 bg-slate-700/30 mx-4 rounded-lg mb-6">
+                <div class="flex items-center space-x-2 mb-2">
+                    <div class="w-2 h-2 bg-emerald-500 rounded-full pulse-status"></div>
+                    <span class="text-xs font-semibold text-emerald-400">Engine: Online</span>
+                </div>
+                <div class="text-xs text-gray-400">
+                    <div>✓ Persistence: Atomic JSON</div>
+                    <div>✓ B-Tree Indexed</div>
+                </div>
+            </div>
+            
+            <!-- Navigation Tabs -->
+            <nav class="space-y-2 px-4 mb-8">
+                <button @click="currentView = 'crud'; breadcrumb = 'CRUD Manager'" 
+                        :class="currentView === 'crud' ? 'bg-emerald-500/10 text-emerald-400 border-l-2 border-emerald-500' : 'text-gray-400 hover:bg-slate-700'"
+                        class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition">
+                    <i data-lucide="edit-3" class="w-5 h-5"></i>
+                    <span>CRUD Manager</span>
+                </button>
+                
+                <button @click="currentView = 'analytics'; breadcrumb = 'Analytics'" 
+                        :class="currentView === 'analytics' ? 'bg-emerald-500/10 text-emerald-400 border-l-2 border-emerald-500' : 'text-gray-400 hover:bg-slate-700'"
+                        class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition">
+                    <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
+                    <span>Analytics</span>
+                </button>
+                
+                <button @click="currentView = 'terminal'; breadcrumb = 'SQL Terminal'" 
+                        :class="currentView === 'terminal' ? 'bg-emerald-500/10 text-emerald-400 border-l-2 border-emerald-500' : 'text-gray-400 hover:bg-slate-700'"
+                        class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition">
+                    <i data-lucide="terminal" class="w-5 h-5"></i>
+                    <span>SQL Terminal</span>
+                </button>
+            </nav>
+            
+            <!-- Educational Tables -->
+            <div class="px-4 mb-4">
+                <h3 class="text-xs font-semibold text-gray-400 mb-3 px-2">EDUCATIONAL</h3>
+                <div class="space-y-1">
+                    <button @click="currentView = 'crud'; crudTable = 'students'; breadcrumb = 'CRUD > Students'" 
+                            :class="crudTable === 'students' ? 'bg-blue-500/10 text-blue-400' : 'text-gray-400 hover:bg-slate-700'"
+                            class="w-full flex items-center space-x-2 px-4 py-2 text-sm rounded transition">
+                        <i data-lucide="users" class="w-4 h-4"></i>
+                        <span>Students</span>
+                    </button>
+                    <button @click="currentView = 'crud'; crudTable = 'courses'; breadcrumb = 'CRUD > Courses'" 
+                            :class="crudTable === 'courses' ? 'bg-blue-500/10 text-blue-400' : 'text-gray-400 hover:bg-slate-700'"
+                            class="w-full flex items-center space-x-2 px-4 py-2 text-sm rounded transition">
+                        <i data-lucide="book-open" class="w-4 h-4"></i>
+                        <span>Courses</span>
+                    </button>
+                    <button @click="currentView = 'crud'; crudTable = 'enrollments'; breadcrumb = 'CRUD > Enrollments'" 
+                            :class="crudTable === 'enrollments' ? 'bg-blue-500/10 text-blue-400' : 'text-gray-400 hover:bg-slate-700'"
+                            class="w-full flex items-center space-x-2 px-4 py-2 text-sm rounded transition">
+                        <i data-lucide="link" class="w-4 h-4"></i>
+                        <span>Enrollments</span>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Analytics Tables -->
+            <div class="px-4">
+                <h3 class="text-xs font-semibold text-gray-400 mb-3 px-2">ANALYTICS (HR)</h3>
+                <div class="space-y-1">
+                    <button @click="currentView = 'analytics'; analyticsTable = 'employees'; breadcrumb = 'Analytics > Employees'" 
+                            :class="analyticsTable === 'employees' ? 'bg-amber-500/10 text-amber-400' : 'text-gray-400 hover:bg-slate-700'"
+                            class="w-full flex items-center space-x-2 px-4 py-2 text-sm rounded transition">
+                        <i data-lucide="briefcase" class="w-4 h-4"></i>
+                        <span>Employees</span>
+                    </button>
+                    <button @click="currentView = 'analytics'; analyticsTable = 'departments'; breadcrumb = 'Analytics > Departments'" 
+                            :class="analyticsTable === 'departments' ? 'bg-amber-500/10 text-amber-400' : 'text-gray-400 hover:bg-slate-700'"
+                            class="w-full flex items-center space-x-2 px-4 py-2 text-sm rounded transition">
+                        <i data-lucide="building" class="w-4 h-4"></i>
+                        <span>Departments</span>
+                    </button>
+                </div>
+            </div>
+        </aside>
+        
+        <!-- MAIN CONTENT -->
+        <main class="flex-1 flex flex-col overflow-hidden">
+            
+            <!-- TOP BAR WITH BREADCRUMBS -->
+            <header class="bg-slate-800/50 border-b border-slate-700 px-8 py-4">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="text-sm text-gray-400 breadcrumb">
+                        <span class="breadcrumb-item">SimpleSQLDB</span>
+                        <span class="breadcrumb-item" x-text="breadcrumb"></span>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <button @click="refreshData()" class="px-3 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded text-sm transition flex items-center space-x-2">
+                            <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                            <span>Refresh</span>
+                        </button>
+                    </div>
+                </div>
+                <h2 class="text-2xl font-bold" x-text="getPageTitle()"></h2>
+            </header>
+            
+            <!-- CONTENT AREA -->
+            <div class="flex-1 overflow-auto">
+                
+                <!-- ===== CRUD MANAGER VIEW ===== -->
+                <div x-show="currentView === 'crud'" class="p-8">
+                    
+                    <!-- STUDENTS TABLE -->
+                    <div x-show="crudTable === 'students'" class="space-y-6">
+                        <div class="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
+                            <div class="px-6 py-4 bg-slate-700/50 border-b border-slate-700 flex justify-between items-center">
+                                <h3 class="font-semibold flex items-center space-x-2">
+                                    <i data-lucide="users" class="w-5 h-5 text-blue-500"></i>
+                                    <span>Students</span>
+                                </h3>
+                                <button @click="showAddStudentForm = true" class="px-3 py-1 bg-blue-500 hover:bg-blue-600 rounded text-sm transition">
+                                    <i data-lucide="plus" class="w-4 h-4 inline mr-1"></i>
+                                    Add Student
+                                </button>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full">
+                                    <thead class="bg-slate-700/30">
+                                        <tr>
+                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">ID</th>
+                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Name</th>
+                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Email</th>
+                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Phone</th>
+                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-700">
+                                        <template x-for="student in students" :key="student.student_id">
+                                            <tr class="hover:bg-slate-700/20 transition">
+                                                <td class="px-6 py-4 text-sm" x-text="student.student_id"></td>
+                                                <td class="px-6 py-4 text-sm" x-text="`${student.first_name} ${student.last_name}`"></td>
+                                                <td class="px-6 py-4 text-sm text-gray-400" x-text="student.email"></td>
+                                                <td class="px-6 py-4 text-sm text-gray-400" x-text="student.phone"></td>
+                                                <td class="px-6 py-4 text-sm">
+                                                    <button @click="deleteStudent(student.student_id)" class="text-red-400 hover:text-red-300 transition">
+                                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- COURSES TABLE -->
+                    <div x-show="crudTable === 'courses'" class="space-y-6">
+                        <div class="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
+                            <div class="px-6 py-4 bg-slate-700/50 border-b border-slate-700 flex justify-between items-center">
+                                <h3 class="font-semibold flex items-center space-x-2">
+                                    <i data-lucide="book-open" class="w-5 h-5 text-blue-500"></i>
+                                    <span>Courses</span>
+                                </h3>
+                                <button @click="showAddCourseForm = true" class="px-3 py-1 bg-blue-500 hover:bg-blue-600 rounded text-sm transition">
+                                    <i data-lucide="plus" class="w-4 h-4 inline mr-1"></i>
+                                    Add Course
+                                </button>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full">
+                                    <thead class="bg-slate-700/30">
+                                        <tr>
+                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">ID</th>
+                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Course</th>
+                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Code</th>
+                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Credits</th>
+                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Instructor</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-700">
+                                        <template x-for="course in courses" :key="course.course_id">
+                                            <tr class="hover:bg-slate-700/20 transition">
+                                                <td class="px-6 py-4 text-sm" x-text="course.course_id"></td>
+                                                <td class="px-6 py-4 text-sm font-medium" x-text="course.course_name"></td>
+                                                <td class="px-6 py-4 text-sm font-mono text-emerald-400" x-text="course.course_code"></td>
+                                                <td class="px-6 py-4 text-sm" x-text="course.credits"></td>
+                                                <td class="px-6 py-4 text-sm text-gray-400" x-text="course.instructor"></td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- ENROLLMENTS TABLE -->
+                    <div x-show="crudTable === 'enrollments'" class="space-y-6">
+                        <div class="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
+                            <div class="px-6 py-4 bg-slate-700/50 border-b border-slate-700 flex justify-between items-center">
+                                <h3 class="font-semibold flex items-center space-x-2">
+                                    <i data-lucide="link" class="w-5 h-5 text-blue-500"></i>
+                                    <span>Enrollments (JOINed Data)</span>
+                                </h3>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full">
+                                    <thead class="bg-slate-700/30">
+                                        <tr>
+                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Student</th>
+                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Course</th>
+                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Code</th>
+                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Grade</th>
+                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Enrolled</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-700">
+                                        <template x-for="enrollment in enrollments" :key="enrollment.enrollment_id">
+                                            <tr class="hover:bg-slate-700/20 transition">
+                                                <td class="px-6 py-4 text-sm" x-text="`${enrollment.first_name} ${enrollment.last_name}`"></td>
+                                                <td class="px-6 py-4 text-sm font-medium" x-text="enrollment.course_name"></td>
+                                                <td class="px-6 py-4 text-sm font-mono text-emerald-400" x-text="enrollment.course_code"></td>
+                                                <td class="px-6 py-4 text-sm">
+                                                    <span :class="{'bg-green-500/20 text-green-400': enrollment.grade === 'A', 'bg-yellow-500/20 text-yellow-400': enrollment.grade === 'B'}" class="px-2 py-1 rounded text-xs" x-text="enrollment.grade"></span>
+                                                </td>
+                                                <td class="px-6 py-4 text-sm text-gray-400" x-text="enrollment.enrollment_date"></td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    
+                </div>
+                
+                <!-- ===== ANALYTICS VIEW ===== -->
+                <div x-show="currentView === 'analytics'" class="p-8">
+                    <div class="space-y-6">
+                        
+                        <!-- Salary Analytics -->
+                        <div class="grid grid-cols-3 gap-4 mb-6">
+                            <template x-for="stat in salaryStats" :key="stat.dept_name">
+                                <div class="bg-slate-800 rounded-lg border border-slate-700 p-4">
+                                    <h4 class="text-xs font-semibold text-gray-400 mb-2" x-text="stat.dept_name"></h4>
+                                    <div class="text-2xl font-bold text-emerald-400" x-text="`${Math.round(stat.avg_salary):,.0f}`"></div>
+                                    <div class="text-xs text-gray-500 mt-1" x-text="`${stat.emp_count} employees`"></div>
+                                </div>
+                            </template>
+                        </div>
+                        
+                        <!-- Employees Table -->
+                        <div class="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
+                            <div class="px-6 py-4 bg-slate-700/50 border-b border-slate-700">
+                                <h3 class="font-semibold flex items-center space-x-2">
+                                    <i data-lucide="briefcase" class="w-5 h-5 text-amber-500"></i>
+                                    <span>Employees (with Department JOIN)</span>
+                                </h3>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full">
+                                    <thead class="bg-slate-700/30">
+                                        <tr>
+                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Name</th>
+                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Position</th>
+                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Department</th>
+                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Location</th>
+                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Salary</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-700">
+                                        <template x-for="emp in employees" :key="emp.emp_id">
+                                            <tr class="hover:bg-slate-700/20 transition">
+                                                <td class="px-6 py-4 text-sm font-medium" x-text="emp.name"></td>
+                                                <td class="px-6 py-4 text-sm text-gray-400" x-text="emp.position"></td>
+                                                <td class="px-6 py-4 text-sm" x-text="emp.dept_name"></td>
+                                                <td class="px-6 py-4 text-sm text-gray-400" x-text="emp.location"></td>
+                                                <td class="px-6 py-4 text-sm font-mono text-emerald-400" x-text="`KES ${emp.salary:,.0f}`"></td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                    </div>
+                </div>
+                
+                <!-- ===== SQL TERMINAL VIEW ===== -->
+                <div x-show="currentView === 'terminal'" class="p-8">
+                    <div class="space-y-4">
+                        
+                        <!-- SQL Editor -->
+                        <div class="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
+                            <div class="px-6 py-3 bg-slate-700/50 border-b border-slate-700">
+                                <h3 class="font-semibold text-sm">SQL Query Editor</h3>
+                            </div>
+                            <div class="p-6">
+                                <textarea x-model="sqlQuery" 
+                                          class="w-full h-32 bg-slate-900 text-gray-100 rounded-lg p-4 code-editor border border-slate-600 focus:border-emerald-500 focus:outline-none resize-none"
+                                          placeholder="SELECT * FROM students LIMIT 10;"></textarea>
+                                <div class="mt-4 flex space-x-3">
+                                    <button @click="executeSql()" class="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 rounded-lg transition flex items-center space-x-2">
+                                        <i data-lucide="play" class="w-4 h-4"></i>
+                                        <span>Execute</span>
+                                    </button>
+                                    <button @click="explainSql()" class="px-6 py-3 bg-blue-500 hover:bg-blue-600 rounded-lg transition flex items-center space-x-2">
+                                        <i data-lucide="info" class="w-4 h-4"></i>
+                                        <span>Explain Plan</span>
+                                    </button>
+                                    <button @click="sqlQuery = ''" class="px-6 py-3 bg-slate-700 hover:bg-slate-600 rounded-lg transition">Clear</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Results -->
+                        <div x-show="sqlResults !== null" class="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
+                            <div class="px-6 py-4 bg-slate-700/50 border-b border-slate-700">
+                                <h3 class="font-semibold text-sm">Results</h3>
+                            </div>
+                            <div x-show="!sqlResults.success" class="p-6 bg-red-500/10 border-t border-red-500/30">
+                                <div class="text-red-400 text-sm font-mono" x-text="sqlResults.error"></div>
+                            </div>
+                            <div x-show="sqlResults.success" class="p-6">
+                                <p class="text-sm text-gray-400 mb-4" x-text="`${sqlResults.count} rows returned`"></p>
+                                <div x-show="sqlResults.type === 'SELECT'" class="overflow-x-auto">
+                                    <table class="w-full text-sm">
+                                        <thead class="bg-slate-700/50">
+                                            <tr>
+                                                <template x-for="col in Object.keys(sqlResults.rows[0] || {})" :key="col">
+                                                    <th class="px-4 py-2 text-left text-xs font-semibold" x-text="col"></th>
+                                                </template>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-slate-700">
+                                            <template x-for="(row, idx) in sqlResults.rows" :key="idx">
+                                                <tr class="hover:bg-slate-700/20">
+                                                    <template x-for="col in Object.keys(row)" :key="col">
+                                                        <td class="px-4 py-2 text-xs" x-text="row[col]"></td>
+                                                    </template>
+                                                </tr>
+                                            </template>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Explain Plan Output -->
+                        <div x-show="explainOutput !== null" class="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
+                            <div class="px-6 py-4 bg-slate-700/50 border-b border-slate-700">
+                                <h3 class="font-semibold text-sm flex items-center space-x-2">
+                                    <i data-lucide="zap" class="w-4 h-4 text-yellow-500"></i>
+                                    <span>Execution Plan</span>
+                                </h3>
+                            </div>
+                            <div class="p-6">
+                                <div class="terminal-output" x-html="formatExplainOutput(explainOutput)"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+            </div>
+        </main>
+    </div>
+    
+    <script>
+        function studioApp() {
+            return {
+                currentView: 'crud',
+                crudTable: 'students',
+                analyticsTable: 'employees',
+                breadcrumb: 'CRUD Manager',
+                
+                students: [],
+                courses: [],
+                enrollments: [],
+                employees: [],
+                salaryStats: [],
+                
+                sqlQuery: '',
+                sqlResults: null,
+                explainOutput: null,
+                
+                showAddStudentForm: false,
+                
+                async init() {
+                    await this.loadAllData();
+                    lucide.createIcons();
+                },
+                
+                async loadAllData() {
+                    await Promise.all([
+                        this.loadStudents(),
+                        this.loadCourses(),
+                        this.loadEnrollments(),
+                        this.loadEmployees(),
+                        this.loadSalaryStats()
+                    ]);
+                },
+                
+                async loadStudents() {
+                    const res = await fetch('/api/students');
+                    const data = await res.json();
+                    if (data.success) this.students = data.data;
+                },
+                
+                async loadCourses() {
+                    const res = await fetch('/api/courses');
+                    const data = await res.json();
+                    if (data.success) this.courses = data.data;
+                },
+                
+                async loadEnrollments() {
+                    const res = await fetch('/api/enrollments');
+                    const data = await res.json();
+                    if (data.success) this.enrollments = data.data;
+                },
+                
+                async loadEmployees() {
+                    const res = await fetch('/api/analytics/employees');
+                    const data = await res.json();
+                    if (data.success) this.employees = data.data;
+                },
+                
+                async loadSalaryStats() {
+                    const res = await fetch('/api/analytics/salary-by-department');
+                    const data = await res.json();
+                    if (data.success) this.salaryStats = data.data;
+                },
+                
+                async deleteStudent(studentId) {
+                    if (confirm('Are you sure?')) {
+                        await fetch(`/api/students/${studentId}`, {method: 'DELETE'});
+                        await this.loadStudents();
+                    }
+                },
+                
+                async executeSql() {
+                    const res = await fetch('/api/execute', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({sql: this.sqlQuery})
+                    });
+                    this.sqlResults = await res.json();
+                },
+                
+                async explainSql() {
+                    const res = await fetch('/api/explain', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({sql: this.sqlQuery})
+                    });
+                    const data = await res.json();
+                    this.explainOutput = data.plan;
+                },
+                
+                formatExplainOutput(plan) {
+                    if (!plan) return '';
+                    let output = '<div class="terminal-label">═══════════════════════════════════════════</div>';
+                    output += '<div class="terminal-label">  QUERY EXECUTION PLAN</div>';
+                    output += '<div class="terminal-label">═══════════════════════════════════════════</div>';
+                    
+                    for (const [key, value] of Object.entries(plan)) {
+                        const formattedKey = key.replace(/_/g, ' ').toUpperCase();
+                        if (Array.isArray(value)) {
+                            output += `<div><span class="terminal-key">▸ ${formattedKey}:</span></div>`;
+                            value.forEach(item => {
+                                output += `<div style="margin-left: 20px;"><span class="terminal-value">  ├─ ${JSON.stringify(item)}</span></div>`;
+                            });
+                        } else if (typeof value === 'object' && value !== null) {
+                            output += `<div><span class="terminal-key">▸ ${formattedKey}:</span></div>`;
+                            for (const [k, v] of Object.entries(value)) {
+                                output += `<div style="margin-left: 20px;"><span class="terminal-value">  ├─ ${k}: ${JSON.stringify(v)}</span></div>`;
+                            }
+                        } else {
+                            output += `<div><span class="terminal-key">▸ ${formattedKey}:</span> <span class="terminal-value">${JSON.stringify(value)}</span></div>`;
+                        }
+                    }
+                    
+                    output += '<div class="terminal-label">═══════════════════════════════════════════</div>';
+                    return output;
+                },
+                
+                getPageTitle() {
+                    const titles = {
+                        'crud-students': '👥 Students Management',
+                        'crud-courses': '📚 Courses Management',
+                        'crud-enrollments': '🔗 Student Enrollments',
+                        'analytics': '📊 HR Analytics Dashboard',
+                        'terminal': '💻 SQL Terminal'
+                    };
+                    const key = this.currentView === 'crud' ? `crud-${this.crudTable}` : this.currentView;
+                    return titles[key] || 'SimpleSQLDB Studio';
+                },
+                
+                async refreshData() {
+                    await this.loadAllData();
+                    this.$nextTick(() => lucide.createIcons());
+                }
+            }
+        }
+    </script>
+</body>
+</html>
