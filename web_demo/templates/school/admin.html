@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Portal - School ERP</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        * { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-950 text-gray-100" x-data="adminApp()">
+    
+    <!-- Top Navigation -->
+    <nav class="bg-red-900/30 border-b border-red-800/50 backdrop-blur-sm sticky top-0 z-50">
+        <div class="px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <div class="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center">
+                        <i data-lucide="shield" class="w-6 h-6 text-white"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold">Admin Portal</h1>
+                        <p class="text-xs text-red-300">Full System Control</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <a href="/school" class="text-sm text-gray-400 hover:text-white transition flex items-center space-x-2">
+                        <i data-lucide="arrow-left" class="w-4 h-4"></i>
+                        <span>Back to Roles</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+    
+    <div class="flex h-screen">
+        
+        <!-- Sidebar -->
+        <aside class="w-64 bg-slate-900 border-r border-slate-800 overflow-y-auto">
+            <div class="p-4">
+                <h3 class="text-xs font-semibold text-gray-500 uppercase mb-3">Management</h3>
+                <nav class="space-y-1">
+                    <button @click="activeTab = 'users'" :class="activeTab === 'users' ? 'bg-red-600 text-white' : 'text-gray-400 hover:bg-slate-800'" class="w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition">
+                        <i data-lucide="users" class="w-5 h-5"></i>
+                        <span>Users</span>
+                    </button>
+                    <button @click="activeTab = 'courses'" :class="activeTab === 'courses' ? 'bg-red-600 text-white' : 'text-gray-400 hover:bg-slate-800'" class="w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition">
+                        <i data-lucide="book-open" class="w-5 h-5"></i>
+                        <span>Courses</span>
+                    </button>
+                    <button @click="activeTab = 'enrollments'" :class="activeTab === 'enrollments' ? 'bg-red-600 text-white' : 'text-gray-400 hover:bg-slate-800'" class="w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition">
+                        <i data-lucide="clipboard-list" class="w-5 h-5"></i>
+                        <span>Enrollments</span>
+                    </button>
+                    <button @click="activeTab = 'financials'" :class="activeTab === 'financials' ? 'bg-red-600 text-white' : 'text-gray-400 hover:bg-slate-800'" class="w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition">
+                        <i data-lucide="dollar-sign" class="w-5 h-5"></i>
+                        <span>Financials</span>
+                    </button>
+                    <button @click="activeTab = 'library'" :class="activeTab === 'library' ? 'bg-red-600 text-white' : 'text-gray-400 hover:bg-slate-800'" class="w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition">
+                        <i data-lucide="library" class="w-5 h-5"></i>
+                        <span>Library</span>
+                    </button>
+                </nav>
+                
+                <h3 class="text-xs font-semibold text-gray-500 uppercase mb-3 mt-6">Advanced</h3>
+                <nav class="space-y-1">
+                    <button @click="activeTab = 'bulk-import'" :class="activeTab === 'bulk-import' ? 'bg-red-600 text-white' : 'text-gray-400 hover:bg-slate-800'" class="w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition">
+                        <i data-lucide="upload" class="w-5 h-5"></i>
+                        <span>Bulk Import</span>
+                    </button>
+                    <button @click="activeTab = 'logs'" :class="activeTab === 'logs' ? 'bg-red-600 text-white' : 'text-gray-400 hover:bg-slate-800'" class="w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition">
+                        <i data-lucide="activity" class="w-5 h-5"></i>
+                        <span>System Logs</span>
+                    </button>
+                </nav>
+            </div>
+        </aside>
+        
+        <!-- Main Content -->
+        <main class="flex-1 overflow-y-auto p-6">
+            
+            <!-- Users Tab -->
+            <div x-show="activeTab === 'users'" x-cloak>
+                <div class="mb-6 flex items-center justify-between">
+                    <div>
+                        <h2 class="text-2xl font-bold">Users Management</h2>
+                        <p class="text-gray-400 text-sm">Manage students, teachers, and administrators</p>
+                    </div>
+                    <button @click="showCreateUserModal = true" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg flex items-center space-x-2 transition">
+                        <i data-lucide="plus" class="w-5 h-5"></i>
+                        <span>Add User</span>
+                    </button>
+                </div>
+                
+                <!-- Filter -->
+                <div class="mb-4 flex space-x-4">
+                    <select x-model="userRoleFilter" @change="loadUsers()" class="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2">
+                        <option value="">All Roles</option>
+                        <option value="Student">Students</option>
+                        <option value="Teacher">Teachers</option>
+                        <option value="Admin">Admins</option>
+                    </select>
+                </div>
+                
+                <!-- Users Table -->
+                <div class="bg-slate-900 rounded-lg border border-slate-800 overflow-hidden">
+                    <table class="w-full">
+                        <thead class="bg-slate-800">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400">ID</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400">Name</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400">Email</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400">Role</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400">Phone</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-400">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="user in users" :key="user.id">
+                                <tr class="border-t border-slate-800 hover:bg-slate-800/50">
+                                    <td class="px-4 py-3 text-sm" x-text="user.id"></td>
+                                    <td class="px-4 py-3 text-sm font-medium" x-text="user.name"></td>
+                                    <td class="px-4 py-3 text-sm text-gray-400" x-text="user.email"></td>
+                                    <td class="px-4 py-3 text-sm">
+                                        <span :class="{
+                                            'bg-purple-500/20 text-purple-300': user.role === 'Student',
+                                            'bg-cyan-500/20 text-cyan-300': user.role === 'Teacher',
+                                            'bg-red-500/20 text-red-300': user.role === 'Admin'
+                                        }" class="px-2 py-1 rounded text-xs font-semibold" x-text="user.role"></span>
+                                    </td>
+                                    <td class="px-4 py-3 text-sm text-gray-400" x-text="user.phone || 'N/A'"></td>
+                                    <td class="px-4 py-3 text-sm">
+                                        <button @click="deleteUser(user.id)" class="text-red-400 hover:text-red-300">
+                                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                    <div x-show="users.length === 0" class="p-8 text-center text-gray-500">
+                        No users found
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Courses Tab -->
+            <div x-show="activeTab === 'courses'" x-cloak>
+                <div class="mb-6 flex items-center justify-between">
+                    <div>
+                        <h2 class="text-2xl font-bold">Courses Management</h2>
+                        <p class="text-gray-400 text-sm">Create and manage academic courses</p>
+                    </div>
+                    <button @click="showCreateCourseModal = true" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg flex items-center space-x-2 transition">
+                        <i data-lucide="plus" class="w-5 h-5"></i>
+                        <span>Add Course</span>
+                    </button>
+                </div>
+                
+                <!-- Courses Grid -->
+                <div class="grid md:grid-cols-2 gap-4">
+                    <template x-for="course in courses" :key="course.id">
+                        <div class="bg-slate-900 rounded-lg border border-slate-800 p-6">
+                            <div class="flex items-start justify-between mb-4">
+                                <div>
+                                    <h3 class="font-bold text-lg" x-text="course.title"></h3>
+                                    <p class="text-sm text-gray-400" x-text="course.code"></p>
+                                </div>
+                                <span class="px-2 py-1 bg-red-500/20 text-red-300 rounded text-xs font-semibold" x-text="course.semester"></span>
+                            </div>
+                            <p class="text-sm text-gray-400 mb-4" x-text="course.description"></p>
+                            <div class="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                    <div class="text-gray-500">Credits</div>
+                                    <div class="font-semibold" x-text="course.credits"></div>
+                                </div>
+                                <div>
+                                    <div class="text-gray-500">Capacity</div>
+                                    <div class="font-semibold" x-text="course.capacity"></div>
+                                </div>
+                                <div>
+                                    <div class="text-gray-500">Room</div>
+                                    <div class="font-semibold" x-text="course.room"></div>
+                                </div>
+                                <div>
+                                    <div class="text-gray-500">Teacher ID</div>
+                                    <div class="font-semibold" x-text="course.teacher_id"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+                <div x-show="courses.length === 0" class="bg-slate-900 rounded-lg border border-slate-800 p-8 text-center text-gray-500">
+                    No courses found
+                </div>
+            </div>
+            
+            <!-- Bulk Import Tab -->
+            <div x-show="activeTab === 'bulk-import'" x-cloak>
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold">Bulk Import Students</h2>
+                    <p class="text-gray-400 text-sm">Import multiple students at once from CSV format</p>
+                </div>
+                
+                <div class="bg-slate-900 rounded-lg border border-slate-800 p-6 mb-6">
+                    <h3 class="font-bold mb-4">CSV Format Example:</h3>
+                    <pre class="bg-slate-950 p-4 rounded text-sm text-gray-400 overflow-x-auto">
+John Doe,john.doe@school.edu,+254700123456,123 Main St,2005-05-15
+Jane Smith,jane.smith@school.edu,+254700234567,456 Oak Ave,2006-03-22
+Bob Johnson,bob.johnson@school.edu,+254700345678,789 Pine Rd,2005-11-30</pre>
+                    <p class="text-xs text-gray-500 mt-2">Format: Name, Email, Phone, Address, Date of Birth</p>
+                </div>
+                
+                <div class="bg-slate-900 rounded-lg border border-slate-800 p-6">
+                    <textarea x-model="csvData" rows="10" placeholder="Paste CSV data here..." class="w-full bg-slate-950 border border-slate-700 rounded px-4 py-3 text-sm"></textarea>
+                    <div class="mt-4 flex items-center justify-between">
+                        <p class="text-sm text-gray-400" x-show="importResult" x-text="importResult"></p>
+                        <button @click="bulkImportStudents()" class="bg-red-600 hover:bg-red-700 px-6 py-2 rounded-lg transition">
+                            Import Students
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- System Logs Tab -->
+            <div x-show="activeTab === 'logs'" x-cloak>
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold">System Logs</h2>
+                    <p class="text-gray-400 text-sm">Real-time feed of all database operations</p>
+                </div>
+                
+                <div class="bg-slate-900 rounded-lg border border-slate-800 overflow-hidden">
+                    <div class="p-4 border-b border-slate-800 flex items-center justify-between">
+                        <span class="text-sm font-semibold">Recent Operations</span>
+                        <button @click="loadLogs()" class="text-sm text-red-400 hover:text-red-300 flex items-center space-x-1">
+                            <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                            <span>Refresh</span>
+                        </button>
+                    </div>
+                    <div class="max-h-96 overflow-y-auto">
+                        <template x-for="log in logs" :key="log.id">
+                            <div class="p-4 border-b border-slate-800 hover:bg-slate-800/50">
+                                <div class="flex items-start justify-between mb-2">
+                                    <div class="flex items-center space-x-2">
+                                        <span :class="{
+                                            'bg-green-500/20 text-green-300': log.status === 'SUCCESS',
+                                            'bg-red-500/20 text-red-300': log.status === 'ERROR'
+                                        }" class="px-2 py-1 rounded text-xs font-semibold" x-text="log.status"></span>
+                                        <span class="text-xs text-gray-500" x-text="log.timestamp"></span>
+                                    </div>
+                                    <span class="text-xs text-gray-400" x-text="log.user_role"></span>
+                                </div>
+                                <div class="text-sm font-semibold mb-1" x-text="log.action"></div>
+                                <code class="text-xs text-gray-500 block overflow-x-auto" x-text="log.sql_command"></code>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+            
+        </main>
+    </div>
+    
+    <!-- Create User Modal -->
+    <div x-show="showCreateUserModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" x-cloak>
+        <div class="bg-slate-900 rounded-lg border border-slate-800 p-6 w-full max-w-md">
+            <h3 class="text-xl font-bold mb-4">Create New User</h3>
+            <form @submit.prevent="createUser()">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Name</label>
+                        <input x-model="newUser.name" type="text" required class="w-full bg-slate-950 border border-slate-700 rounded px-4 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Email</label>
+                        <input x-model="newUser.email" type="email" required class="w-full bg-slate-950 border border-slate-700 rounded px-4 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Role</label>
+                        <select x-model="newUser.role" required class="w-full bg-slate-950 border border-slate-700 rounded px-4 py-2">
+                            <option value="Student">Student</option>
+                            <option value="Teacher">Teacher</option>
+                            <option value="Admin">Admin</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Phone</label>
+                        <input x-model="newUser.phone" type="text" class="w-full bg-slate-950 border border-slate-700 rounded px-4 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Address</label>
+                        <input x-model="newUser.address" type="text" class="w-full bg-slate-950 border border-slate-700 rounded px-4 py-2">
+                    </div>
+                </div>
+                <div class="mt-6 flex space-x-3">
+                    <button type="button" @click="showCreateUserModal = false" class="flex-1 bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg transition">Cancel</button>
+                    <button type="submit" class="flex-1 bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg transition">Create</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Create Course Modal -->
+    <div x-show="showCreateCourseModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50" x-cloak>
+        <div class="bg-slate-900 rounded-lg border border-slate-800 p-6 w-full max-w-md">
+            <h3 class="text-xl font-bold mb-4">Create New Course</h3>
+            <form @submit.prevent="createCourse()">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Title</label>
+                        <input x-model="newCourse.title" type="text" required class="w-full bg-slate-950 border border-slate-700 rounded px-4 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Course Code</label>
+                        <input x-model="newCourse.code" type="text" required class="w-full bg-slate-950 border border-slate-700 rounded px-4 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Description</label>
+                        <input x-model="newCourse.description" type="text" class="w-full bg-slate-950 border border-slate-700 rounded px-4 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Teacher ID</label>
+                        <input x-model="newCourse.teacher_id" type="number" required class="w-full bg-slate-950 border border-slate-700 rounded px-4 py-2">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">Credits</label>
+                            <input x-model="newCourse.credits" type="number" required class="w-full bg-slate-950 border border-slate-700 rounded px-4 py-2">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">Capacity</label>
+                            <input x-model="newCourse.capacity" type="number" value="30" class="w-full bg-slate-950 border border-slate-700 rounded px-4 py-2">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Semester</label>
+                        <select x-model="newCourse.semester" required class="w-full bg-slate-950 border border-slate-700 rounded px-4 py-2">
+                            <option value="Fall 2026">Fall 2026</option>
+                            <option value="Spring 2026">Spring 2026</option>
+                            <option value="Summer 2026">Summer 2026</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Room</label>
+                        <input x-model="newCourse.room" type="text" class="w-full bg-slate-950 border border-slate-700 rounded px-4 py-2">
+                    </div>
+                </div>
+                <div class="mt-6 flex space-x-3">
+                    <button type="button" @click="showCreateCourseModal = false" class="flex-1 bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg transition">Cancel</button>
+                    <button type="submit" class="flex-1 bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg transition">Create</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <script>
+        function adminApp() {
+            return {
+                activeTab: 'users',
+                users: [],
+                courses: [],
+                logs: [],
+                userRoleFilter: '',
+                showCreateUserModal: false,
+                showCreateCourseModal: false,
+                csvData: '',
+                importResult: '',
+                newUser: {
+                    name: '',
+                    email: '',
+                    role: 'Student',
+                    phone: '',
+                    address: ''
+                },
+                newCourse: {
+                    title: '',
+                    code: '',
+                    description: '',
+                    teacher_id: '',
+                    credits: 3,
+                    semester: 'Fall 2026',
+                    capacity: 30,
+                    room: ''
+                },
+                
+                init() {
+                    this.loadUsers();
+                    this.loadCourses();
+                    this.loadLogs();
+                    lucide.createIcons();
+                    setInterval(() => lucide.createIcons(), 500);
+                },
+                
+                async loadUsers() {
+                    const url = this.userRoleFilter ? `/api/users?role=${this.userRoleFilter}` : '/api/users';
+                    const response = await fetch(url);
+                    this.users = await response.json();
+                },
+                
+                async loadCourses() {
+                    const response = await fetch('/api/courses');
+                    this.courses = await response.json();
+                },
+                
+                async loadLogs() {
+                    const response = await fetch('/api/system-logs');
+                    this.logs = await response.json();
+                },
+                
+                async createUser() {
+                    const response = await fetch('/api/users', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(this.newUser)
+                    });
+                    const result = await response.json();
+                    if (result.success) {
+                        this.showCreateUserModal = false;
+                        this.loadUsers();
+                        this.newUser = { name: '', email: '', role: 'Student', phone: '', address: '' };
+                    } else {
+                        alert('Error: ' + result.error);
+                    }
+                },
+                
+                async createCourse() {
+                    const response = await fetch('/api/courses', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(this.newCourse)
+                    });
+                    const result = await response.json();
+                    if (result.success) {
+                        this.showCreateCourseModal = false;
+                        this.loadCourses();
+                        this.newCourse = { title: '', code: '', description: '', teacher_id: '', credits: 3, semester: 'Fall 2026', capacity: 30, room: '' };
+                    } else {
+                        alert('Error: ' + result.error);
+                    }
+                },
+                
+                async deleteUser(userId) {
+                    if (!confirm('Are you sure you want to delete this user?')) return;
+                    const response = await fetch(`/api/users/${userId}`, { method: 'DELETE' });
+                    const result = await response.json();
+                    if (result.success) {
+                        this.loadUsers();
+                    } else {
+                        alert('Error: ' + result.error);
+                    }
+                },
+                
+                async bulkImportStudents() {
+                    const lines = this.csvData.trim().split('\n');
+                    const students = lines.map(line => {
+                        const [name, email, phone, address, date_of_birth] = line.split(',').map(s => s.trim());
+                        return { name, email, phone, address, date_of_birth };
+                    });
+                    
+                    const response = await fetch('/api/bulk-import/students', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ students })
+                    });
+                    const result = await response.json();
+                    this.importResult = `Imported ${result.imported} of ${result.total} students`;
+                    this.csvData = '';
+                    this.loadUsers();
+                    setTimeout(() => { this.importResult = ''; }, 5000);
+                }
+            }
+        }
+    </script>
+</body>
+</html>

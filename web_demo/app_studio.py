@@ -153,6 +153,12 @@ def index():
     return render_template('index.html')
 
 
+@app.route('/school')
+def school_home():
+    """Redirect to School ERP homepage"""
+    return "<html><body><h1>School ERP System</h1><p>Please run the School ERP on port 5001:</p><code>python web_demo/app_school.py</code><p>Or visit <a href='http://localhost:5001'>http://localhost:5001</a></p><p><a href='/'>← Back to Gateway</a></p></body></html>"
+
+
 @app.route('/studio')
 def studio():
     """Render the main studio dashboard"""
