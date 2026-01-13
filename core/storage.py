@@ -91,7 +91,7 @@ class Storage:
             OSError: If data directory cannot be created
         """
         self.data_dir = Path(data_dir)
-        self.data_dir.mkdir(exist_ok=True)
+        self.data_dir.mkdir(parents=True, exist_ok=True)
         
         # In-memory state mirrors disk storage
         self.tables: Dict[str, Table] = {}                    # Table schemas
@@ -515,7 +515,17 @@ class Storage:
         
         # Atomic rename - prevents corruption if power fails mid-write
         import os
-        os.replace(temp_file, data_file)
+        import time
+        # On Windows, file indexers/AV can transiently lock files causing PermissionError.
+        # Retry a few times to make saves reliable under normal desktop environments.
+        for attempt in range(6):
+            try:
+                os.replace(temp_file, data_file)
+                break
+            except PermissionError:
+                if attempt >= 5:
+                    raise
+                time.sleep(0.05 * (attempt + 1))
     
     def _load_all_tables(self):
         """Load all tables from disk"""

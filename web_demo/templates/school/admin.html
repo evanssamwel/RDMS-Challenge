@@ -26,13 +26,13 @@
                     </div>
                     <div>
                         <h1 class="text-xl font-bold">Admin Portal</h1>
-                        <p class="text-xs text-red-300">Full System Control</p>
+                        <p class="text-xs text-red-300">Welcome, {{ user.name }}</p>
                     </div>
                 </div>
                 <div class="flex items-center space-x-4">
-                    <a href="/school" class="text-sm text-gray-400 hover:text-white transition flex items-center space-x-2">
-                        <i data-lucide="arrow-left" class="w-4 h-4"></i>
-                        <span>Back to Roles</span>
+                    <a href="/logout" class="text-sm text-gray-400 hover:text-white transition flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg border border-slate-700">
+                        <i data-lucide="log-out" class="w-4 h-4"></i>
+                        <span>Logout</span>
                     </a>
                 </div>
             </div>

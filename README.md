@@ -4,6 +4,8 @@
 
 SimpleSQLDB is a fully functional relational database management system (RDBMS) built from scratch in Python. It features SQL query support, B-tree indexing, JOIN operations, and a professional web-based dashboard showcasing CRUD operations.
 
+→ **Full consolidated docs:** [DOCUMENTATION.md](DOCUMENTATION.md)
+
 ## 🏗️ Architecture: Professional Separation of Concerns
 
 SimpleSQLDB demonstrates **enterprise-grade N-Tier Architecture** with strict separation of concerns:
@@ -33,7 +35,7 @@ SimpleSQLDB demonstrates **enterprise-grade N-Tier Architecture** with strict se
 - **Direct Python API** (import core.engine)
 - **Any custom application**
 
-→ **Read [ARCHITECTURE.md](ARCHITECTURE.md) for detailed design documentation**
+→ **Read [ARCHITECTURE](DOCUMENTATION.md#architecture-from-architecturemd) for detailed design documentation**
 
 ## 🌟 Features
 
@@ -73,13 +75,20 @@ RDMS/
 ├── repl/                    # Interactive SQL REPL
 │   └── cli.py              # Command-line interface
 ├── web_demo/               # Web application demo
-│   ├── app.py              # Flask application
+│   ├── app_studio.py       # Unified Web Studio (CRUD + analytics + SQL)
+│   ├── app_school.py       # School ERP demo (runs on port 5001)
 │   ├── templates/          # HTML templates
 │   └── static/             # CSS stylesheets
-├── data/                   # Database files (auto-created)
-├── web_data/               # Web app database (auto-created)
+├── databases/              # School ERP database folder(s)
+│   └── school_erp/         # Persisted JSON tables for the School ERP
+├── studio_data/            # Web Studio database (auto-created on first run)
+├── scripts/                # Helper scripts
+├── populate_school_data.py # Seeds the School ERP database
+├── populate_kenyan_data.py # Seeds the HR analytics dataset (Studio)
+├── demo_advanced.py        # Runs a quick advanced-feature demo
 ├── tests/                  # Unit tests
 ├── requirements.txt        # Python dependencies
+├── DOCUMENTATION.md        # Consolidated documentation (guides merged)
 └── README.md              # This file
 ```
 
@@ -163,9 +172,11 @@ from core.engine import QueryEngine
 engine = QueryEngine()
 
 # Execute queries programmatically
-students = engine.execute("SELECT * FROM students")
-print(students)
-# Output: [{'id': 1, 'name': 'John', ...}, {'id': 2, 'name': 'Jane', ...}]
+result = engine.execute("SELECT * FROM students")
+if result["success"]:
+   print(result["rows"])
+else:
+   raise RuntimeError(result.get("error") or result.get("message") or "Query failed")
 
 # Use aggregates
 stats = engine.execute("""
@@ -174,12 +185,15 @@ stats = engine.execute("""
     GROUP BY dept_id
 """)
 
+if stats["success"]:
+   print(stats["rows"])
+
 # Get execution plans
 plan = engine.explain("SELECT * FROM employees WHERE salary > 100000")
 print(plan)  # Shows B-tree usage, access methods, etc.
 ```
 
-→ **Read [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) for more examples**
+→ **Read [DEVELOPER_GUIDE](DOCUMENTATION.md#developer_guide-from-developer_guidemd) for more examples**
 
 ### Running the Web Application
 
@@ -269,7 +283,7 @@ Instead of separate applications, we built a **Unified Management Studio** that 
 
 1. **Start the Flask server**
    ```powershell
-   python web_demo/app.py
+   python web_demo/app_studio.py
    ```
 
 2. **Open your browser** and navigate to:
@@ -403,7 +417,7 @@ CREATE INDEX idx_student_email ON students (email);
 
 Run the test suite:
 ```powershell
-python -m pytest tests/ -v
+python -m pytest -q
 ```
 
 ## 📊 Performance Characteristics

@@ -239,7 +239,7 @@
                                     <i data-lucide="users" class="w-5 h-5 text-blue-500"></i>
                                     <span>Students</span>
                                 </h3>
-                                <button @click="showAddStudentForm = true" class="px-3 py-1 bg-blue-500 hover:bg-blue-600 rounded text-sm transition">
+                                <button @click="openAddStudent()" class="px-3 py-1 bg-blue-500 hover:bg-blue-600 rounded text-sm transition">
                                     <i data-lucide="plus" class="w-4 h-4 inline mr-1"></i>
                                     Add Student
                                 </button>
@@ -263,14 +263,78 @@
                                                 <td class="px-6 py-4 text-sm text-gray-400" x-text="student.email"></td>
                                                 <td class="px-6 py-4 text-sm text-gray-400" x-text="student.phone"></td>
                                                 <td class="px-6 py-4 text-sm">
-                                                    <button @click="deleteStudent(student.student_id)" class="text-red-400 hover:text-red-300 transition">
-                                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
-                                                    </button>
+                                                    <div class="flex items-center space-x-3">
+                                                        <button @click="openEditStudent(student)" class="text-blue-400 hover:text-blue-300 transition" title="Edit">
+                                                            <i data-lucide="pencil" class="w-4 h-4"></i>
+                                                        </button>
+                                                        <button @click="deleteStudent(student.student_id)" class="text-red-400 hover:text-red-300 transition" title="Delete">
+                                                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                                        </button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         </template>
                                     </tbody>
                                 </table>
+                            </div>
+                        </div>
+
+                        <!-- Student Modal (Add/Edit) -->
+                        <div x-show="showStudentModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center">
+                            <div class="absolute inset-0 bg-black/60" @click="closeStudentModal()"></div>
+                            <div class="relative w-full max-w-xl mx-4 bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+                                <div class="px-6 py-4 bg-slate-700/50 border-b border-slate-700 flex items-center justify-between">
+                                    <h3 class="font-semibold" x-text="studentFormMode === 'edit' ? 'Edit Student' : 'Add Student'"></h3>
+                                    <button @click="closeStudentModal()" class="text-gray-400 hover:text-gray-200">
+                                        <i data-lucide="x" class="w-5 h-5"></i>
+                                    </button>
+                                </div>
+                                <div class="p-6 space-y-4">
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-xs font-semibold text-gray-400 mb-2">Student ID (optional)</label>
+                                            <input x-model="studentForm.student_id" :disabled="studentFormMode === 'edit'" type="number"
+                                                   class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                                                   placeholder="Auto" />
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-semibold text-gray-400 mb-2">Enrollment Date</label>
+                                            <input x-model="studentForm.enrollment_date" type="date"
+                                                   class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none" />
+                                        </div>
+                                    </div>
+
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-xs font-semibold text-gray-400 mb-2">First Name</label>
+                                            <input x-model="studentForm.first_name" type="text"
+                                                   class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none" />
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-semibold text-gray-400 mb-2">Last Name</label>
+                                            <input x-model="studentForm.last_name" type="text"
+                                                   class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none" />
+                                        </div>
+                                    </div>
+
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-xs font-semibold text-gray-400 mb-2">Email</label>
+                                            <input x-model="studentForm.email" type="email"
+                                                   class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none" />
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-semibold text-gray-400 mb-2">Phone</label>
+                                            <input x-model="studentForm.phone" type="text"
+                                                   class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none" />
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center justify-end space-x-3 pt-2">
+                                        <button @click="closeStudentModal()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition">Cancel</button>
+                                        <button @click="saveStudent()" class="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg text-sm transition">Save</button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -323,6 +387,10 @@
                                     <i data-lucide="link" class="w-5 h-5 text-blue-500"></i>
                                     <span>Enrollments (JOINed Data)</span>
                                 </h3>
+                                <button @click="openAddEnrollment()" class="px-3 py-1 bg-blue-500 hover:bg-blue-600 rounded text-sm transition">
+                                    <i data-lucide="plus" class="w-4 h-4 inline mr-1"></i>
+                                    Add Enrollment
+                                </button>
                             </div>
                             <div class="overflow-x-auto">
                                 <table class="w-full">
@@ -333,6 +401,7 @@
                                             <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Code</th>
                                             <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Grade</th>
                                             <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Enrolled</th>
+                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-slate-700">
@@ -345,10 +414,85 @@
                                                     <span :class="{'bg-green-500/20 text-green-400': enrollment.grade === 'A', 'bg-yellow-500/20 text-yellow-400': enrollment.grade === 'B'}" class="px-2 py-1 rounded text-xs" x-text="enrollment.grade"></span>
                                                 </td>
                                                 <td class="px-6 py-4 text-sm text-gray-400" x-text="enrollment.enrollment_date"></td>
+                                                <td class="px-6 py-4 text-sm">
+                                                    <div class="flex items-center space-x-3">
+                                                        <button @click="openEditEnrollment(enrollment)" class="text-blue-400 hover:text-blue-300 transition" title="Edit">
+                                                            <i data-lucide="pencil" class="w-4 h-4"></i>
+                                                        </button>
+                                                        <button @click="deleteEnrollment(enrollment.enrollment_id)" class="text-red-400 hover:text-red-300 transition" title="Delete">
+                                                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                                        </button>
+                                                    </div>
+                                                </td>
                                             </tr>
                                         </template>
                                     </tbody>
                                 </table>
+                            </div>
+                        </div>
+
+                        <!-- Enrollment Modal (Add/Edit) -->
+                        <div x-show="showEnrollmentModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center">
+                            <div class="absolute inset-0 bg-black/60" @click="closeEnrollmentModal()"></div>
+                            <div class="relative w-full max-w-xl mx-4 bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+                                <div class="px-6 py-4 bg-slate-700/50 border-b border-slate-700 flex items-center justify-between">
+                                    <h3 class="font-semibold" x-text="enrollmentFormMode === 'edit' ? 'Edit Enrollment' : 'Add Enrollment'"></h3>
+                                    <button @click="closeEnrollmentModal()" class="text-gray-400 hover:text-gray-200">
+                                        <i data-lucide="x" class="w-5 h-5"></i>
+                                    </button>
+                                </div>
+                                <div class="p-6 space-y-4">
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-xs font-semibold text-gray-400 mb-2">Enrollment ID (optional)</label>
+                                            <input x-model="enrollmentForm.enrollment_id" :disabled="enrollmentFormMode === 'edit'" type="number"
+                                                   class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                                                   placeholder="Auto" />
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-semibold text-gray-400 mb-2">Enrollment Date</label>
+                                            <input x-model="enrollmentForm.enrollment_date" type="date"
+                                                   class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none" />
+                                        </div>
+                                    </div>
+
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-xs font-semibold text-gray-400 mb-2">Student</label>
+                                            <select x-model="enrollmentForm.student_id"
+                                                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none">
+                                                <option value="">Select student...</option>
+                                                <template x-for="s in students" :key="s.student_id">
+                                                    <option :value="s.student_id" x-text="`${s.student_id} - ${s.first_name} ${s.last_name}`"></option>
+                                                </template>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-semibold text-gray-400 mb-2">Course</label>
+                                            <select x-model="enrollmentForm.course_id"
+                                                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none">
+                                                <option value="">Select course...</option>
+                                                <template x-for="c in courses" :key="c.course_id">
+                                                    <option :value="c.course_id" x-text="`${c.course_id} - ${c.course_code} (${c.course_name})`"></option>
+                                                </template>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-xs font-semibold text-gray-400 mb-2">Grade</label>
+                                            <input x-model="enrollmentForm.grade" type="text"
+                                                   class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
+                                                   placeholder="A" />
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center justify-end space-x-3 pt-2">
+                                        <button @click="closeEnrollmentModal()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition">Cancel</button>
+                                        <button @click="saveEnrollment()" class="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg text-sm transition">Save</button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -504,7 +648,26 @@
                 sqlResults: null,
                 explainOutput: null,
                 
-                showAddStudentForm: false,
+                showStudentModal: false,
+                studentFormMode: 'add',
+                studentForm: {
+                    student_id: '',
+                    first_name: '',
+                    last_name: '',
+                    email: '',
+                    phone: '',
+                    enrollment_date: ''
+                },
+
+                showEnrollmentModal: false,
+                enrollmentFormMode: 'add',
+                enrollmentForm: {
+                    enrollment_id: '',
+                    student_id: '',
+                    course_id: '',
+                    grade: 'A',
+                    enrollment_date: ''
+                },
                 
                 async init() {
                     await this.loadAllData();
@@ -555,6 +718,145 @@
                     if (confirm('Are you sure?')) {
                         await fetch(`/api/students/${studentId}`, {method: 'DELETE'});
                         await this.loadStudents();
+                        await this.loadEnrollments();
+                        this.$nextTick(() => lucide.createIcons());
+                    }
+                },
+
+                openAddStudent() {
+                    this.studentFormMode = 'add';
+                    const today = new Date().toISOString().slice(0, 10);
+                    this.studentForm = {
+                        student_id: '',
+                        first_name: '',
+                        last_name: '',
+                        email: '',
+                        phone: '',
+                        enrollment_date: today
+                    };
+                    this.showStudentModal = true;
+                    this.$nextTick(() => lucide.createIcons());
+                },
+
+                openEditStudent(student) {
+                    this.studentFormMode = 'edit';
+                    this.studentForm = {
+                        student_id: student.student_id,
+                        first_name: student.first_name,
+                        last_name: student.last_name,
+                        email: student.email,
+                        phone: student.phone,
+                        enrollment_date: student.enrollment_date || new Date().toISOString().slice(0, 10)
+                    };
+                    this.showStudentModal = true;
+                    this.$nextTick(() => lucide.createIcons());
+                },
+
+                closeStudentModal() {
+                    this.showStudentModal = false;
+                },
+
+                async saveStudent() {
+                    const payload = {...this.studentForm};
+                    if (payload.student_id === '') delete payload.student_id;
+
+                    let url = '/api/students';
+                    let method = 'POST';
+                    if (this.studentFormMode === 'edit') {
+                        url = `/api/students/${this.studentForm.student_id}`;
+                        method = 'PUT';
+                        delete payload.student_id;
+                        delete payload.enrollment_date;
+                    }
+
+                    const res = await fetch(url, {
+                        method,
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(payload)
+                    });
+                    const data = await res.json();
+                    if (!data.success) {
+                        alert(data.error || 'Operation failed');
+                        return;
+                    }
+                    this.closeStudentModal();
+                    await this.loadStudents();
+                    await this.loadEnrollments();
+                    this.$nextTick(() => lucide.createIcons());
+                },
+
+                openAddEnrollment() {
+                    this.enrollmentFormMode = 'add';
+                    const today = new Date().toISOString().slice(0, 10);
+                    this.enrollmentForm = {
+                        enrollment_id: '',
+                        student_id: '',
+                        course_id: '',
+                        grade: 'A',
+                        enrollment_date: today
+                    };
+                    this.showEnrollmentModal = true;
+                    this.$nextTick(() => lucide.createIcons());
+                },
+
+                openEditEnrollment(enrollment) {
+                    this.enrollmentFormMode = 'edit';
+                    this.enrollmentForm = {
+                        enrollment_id: enrollment.enrollment_id,
+                        student_id: enrollment.student_id,
+                        course_id: enrollment.course_id,
+                        grade: enrollment.grade || 'A',
+                        enrollment_date: enrollment.enrollment_date || new Date().toISOString().slice(0, 10)
+                    };
+                    this.showEnrollmentModal = true;
+                    this.$nextTick(() => lucide.createIcons());
+                },
+
+                closeEnrollmentModal() {
+                    this.showEnrollmentModal = false;
+                },
+
+                async saveEnrollment() {
+                    const payload = {...this.enrollmentForm};
+                    if (payload.enrollment_id === '') delete payload.enrollment_id;
+                    if (payload.student_id === '' || payload.course_id === '') {
+                        alert('Student and Course are required');
+                        return;
+                    }
+
+                    let url = '/api/enrollments';
+                    let method = 'POST';
+                    if (this.enrollmentFormMode === 'edit') {
+                        url = `/api/enrollments/${this.enrollmentForm.enrollment_id}`;
+                        method = 'PUT';
+                        delete payload.enrollment_id;
+                    }
+
+                    const res = await fetch(url, {
+                        method,
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(payload)
+                    });
+                    const data = await res.json();
+                    if (!data.success) {
+                        alert(data.error || 'Operation failed');
+                        return;
+                    }
+                    this.closeEnrollmentModal();
+                    await this.loadEnrollments();
+                    this.$nextTick(() => lucide.createIcons());
+                },
+
+                async deleteEnrollment(enrollmentId) {
+                    if (confirm('Delete this enrollment?')) {
+                        const res = await fetch(`/api/enrollments/${enrollmentId}`, {method: 'DELETE'});
+                        const data = await res.json();
+                        if (!data.success) {
+                            alert(data.error || 'Delete failed');
+                            return;
+                        }
+                        await this.loadEnrollments();
+                        this.$nextTick(() => lucide.createIcons());
                     }
                 },
                 

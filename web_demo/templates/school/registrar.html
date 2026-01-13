@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registrar Dashboard - School ERP</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        * { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-950 text-gray-100" x-data="registrarApp()">
+    
+    <nav class="bg-orange-900/30 border-b border-orange-800/50 backdrop-blur-sm sticky top-0 z-50">
+        <div class="px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <div class="w-10 h-10 bg-orange-600 rounded-lg flex items-center justify-center">
+                        <i data-lucide="bar-chart-3" class="w-6 h-6 text-white"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold">Registrar Portal</h1>
+                        <p class="text-xs text-orange-300">Welcome, {{ user.name }}</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <a href="/logout" class="text-sm text-gray-400 hover:text-white transition flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg border border-slate-700">
+                        <i data-lucide="log-out" class="w-4 h-4"></i>
+                        <span>Logout</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+    
+    <div class="max-w-7xl mx-auto p-6">
+        <div class="bg-slate-900 rounded-xl border border-slate-800 p-8 text-center text-gray-400">
+            <div class="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i data-lucide="pie-chart" class="w-8 h-8 text-orange-500"></i>
+            </div>
+            <h2 class="text-xl font-bold mb-2 text-white">Under Construction</h2>
+            <p>Advanced analytics dashboard is currently being calibrated.</p>
+        </div>
+    </div>
+
+    <script>
+        function registrarApp() {
+            return {
+                init() {
+                    lucide.createIcons();
+                }
+            }
+        }
+    </script>
+</body>
+</html>

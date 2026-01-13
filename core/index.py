@@ -257,19 +257,27 @@ class BTreeIndex:
         
         new_child = BTreeNode(is_leaf=full_child.is_leaf, max_keys=self.max_keys)
         
-        # Move half of the keys to new child
-        new_child.keys = full_child.keys[mid + 1:]
-        full_child.keys = full_child.keys[:mid]
+        # Capture the middle key before modifying the list
+        mid_key = full_child.keys[mid]
         
         if full_child.is_leaf:
-            new_child.values = full_child.values[mid + 1:]
+            # Leaf Split: Keep 'mid' in the right child (Copy Up)
+            new_child.keys = full_child.keys[mid:]
+            full_child.keys = full_child.keys[:mid]
+            
+            # Split values
+            new_child.values = full_child.values[mid:]
             full_child.values = full_child.values[:mid]
         else:
+            # Internal Split: 'mid' moves up (Push Up) and is excluded from children
+            new_child.keys = full_child.keys[mid + 1:]
+            full_child.keys = full_child.keys[:mid]
+            
+            # Split children
             new_child.children = full_child.children[mid + 1:]
             full_child.children = full_child.children[:mid + 1]
         
         # Insert middle key into parent
-        mid_key = full_child.keys[mid] if full_child.is_leaf else new_child.keys[0]
         parent.keys.insert(index, mid_key)
         parent.children.insert(index + 1, new_child)
     

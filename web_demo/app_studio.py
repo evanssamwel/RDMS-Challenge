@@ -30,6 +30,39 @@ engine_status = {
 }
 
 
+def _sql_text(value) -> str:
+    """Sanitize text for the project's simple SQL parser.
+
+    - Escapes single quotes.
+    - Removes commas (the parser is not robust with commas inside quoted strings).
+    - Normalizes whitespace.
+    """
+    if value is None:
+        return ''
+    text = str(value)
+    text = text.replace("'", "''")
+    text = text.replace(",", " ")
+    text = text.replace("\r", " ").replace("\n", " ")
+    return " ".join(text.split())
+
+
+def _next_int_id(table_name: str, id_column: str) -> int:
+    """Compute the next integer id for a table using in-memory storage."""
+    if table_name not in storage.data:
+        return 1
+    values = []
+    for row in storage.data.get(table_name, []):
+        value = row.get(id_column)
+        if isinstance(value, int):
+            values.append(value)
+        else:
+            try:
+                values.append(int(value))
+            except Exception:
+                continue
+    return (max(values) + 1) if values else 1
+
+
 def init_databases():
     """Initialize both educational and analytics datasets"""
     tables = storage.list_tables()
@@ -174,11 +207,9 @@ def get_students():
     """Fetch all students"""
     try:
         result = engine.execute("SELECT * FROM students")
-        return jsonify({
-            'success': True,
-            'data': result,
-            'count': len(result)
-        })
+        if not result.get('success'):
+            return jsonify({'success': False, 'error': result.get('error', 'Query failed')}), 400
+        return jsonify({'success': True, 'data': result.get('rows', []), 'count': result.get('count', 0)})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -187,14 +218,28 @@ def get_students():
 def create_student():
     """Create a new student"""
     try:
-        data = request.json
+        data = request.json or {}
+        student_id = data.get('student_id')
+        if student_id in (None, ''):
+            student_id = _next_int_id('students', 'student_id')
+        else:
+            student_id = int(student_id)
+
+        first_name = _sql_text(data.get('first_name', ''))
+        last_name = _sql_text(data.get('last_name', ''))
+        email = _sql_text(data.get('email', ''))
+        phone = _sql_text(data.get('phone', ''))
+        enrollment_date = _sql_text(data.get('enrollment_date', datetime.now().date().isoformat()))
+
         query = f"""
             INSERT INTO students 
             (student_id, first_name, last_name, email, phone, enrollment_date) 
-            VALUES ({data['student_id']}, '{data['first_name']}', '{data['last_name']}', '{data['email']}', '{data['phone']}', '{data['enrollment_date']}')
+            VALUES ({student_id}, '{first_name}', '{last_name}', '{email}', '{phone}', '{enrollment_date}')
         """
-        engine.execute(query)
-        return jsonify({'success': True, 'message': 'Student created'})
+        result = engine.execute(query)
+        if not result.get('success'):
+            return jsonify({'success': False, 'error': result.get('error', 'Insert failed')}), 400
+        return jsonify({'success': True, 'message': 'Student created', 'student_id': student_id})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -203,7 +248,11 @@ def create_student():
 def update_student(student_id):
     """Update a student"""
     try:
-        data = request.json
+        data = request.json or {}
+        first_name = _sql_text(data.get('first_name', ''))
+        last_name = _sql_text(data.get('last_name', ''))
+        email = _sql_text(data.get('email', ''))
+        phone = _sql_text(data.get('phone', ''))
         query = f"""
             UPDATE students 
             SET first_name = '{data['first_name']}', 
@@ -212,7 +261,17 @@ def update_student(student_id):
                 phone = '{data['phone']}'
             WHERE student_id = {student_id}
         """
-        engine.execute(query)
+        query = f"""
+            UPDATE students 
+            SET first_name = '{first_name}', 
+                last_name = '{last_name}', 
+                email = '{email}', 
+                phone = '{phone}'
+            WHERE student_id = {student_id}
+        """
+        result = engine.execute(query)
+        if not result.get('success'):
+            return jsonify({'success': False, 'error': result.get('error', 'Update failed')}), 400
         return jsonify({'success': True, 'message': 'Student updated'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -222,7 +281,9 @@ def update_student(student_id):
 def delete_student(student_id):
     """Delete a student"""
     try:
-        engine.execute(f"DELETE FROM students WHERE student_id = {student_id}")
+        result = engine.execute(f"DELETE FROM students WHERE student_id = {student_id}")
+        if not result.get('success'):
+            return jsonify({'success': False, 'error': result.get('error', 'Delete failed')}), 400
         return jsonify({'success': True, 'message': 'Student deleted'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -233,11 +294,9 @@ def get_courses():
     """Fetch all courses"""
     try:
         result = engine.execute("SELECT * FROM courses")
-        return jsonify({
-            'success': True,
-            'data': result,
-            'count': len(result)
-        })
+        if not result.get('success'):
+            return jsonify({'success': False, 'error': result.get('error', 'Query failed')}), 400
+        return jsonify({'success': True, 'data': result.get('rows', []), 'count': result.get('count', 0)})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -246,14 +305,26 @@ def get_courses():
 def create_course():
     """Create a new course"""
     try:
-        data = request.json
+        data = request.json or {}
+        course_id = data.get('course_id')
+        if course_id in (None, ''):
+            course_id = _next_int_id('courses', 'course_id')
+        else:
+            course_id = int(course_id)
+
+        course_name = _sql_text(data.get('course_name', ''))
+        course_code = _sql_text(data.get('course_code', ''))
+        instructor = _sql_text(data.get('instructor', ''))
+        credits = int(data.get('credits', 0) or 0)
         query = f"""
             INSERT INTO courses 
             (course_id, course_name, course_code, credits, instructor) 
-            VALUES ({data['course_id']}, '{data['course_name']}', '{data['course_code']}', {data['credits']}, '{data['instructor']}')
+            VALUES ({course_id}, '{course_name}', '{course_code}', {credits}, '{instructor}')
         """
-        engine.execute(query)
-        return jsonify({'success': True, 'message': 'Course created'})
+        result = engine.execute(query)
+        if not result.get('success'):
+            return jsonify({'success': False, 'error': result.get('error', 'Insert failed')}), 400
+        return jsonify({'success': True, 'message': 'Course created', 'course_id': course_id})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -262,17 +333,37 @@ def create_course():
 def get_enrollments():
     """Fetch all enrollments with student and course info"""
     try:
-        result = engine.execute("""
-            SELECT e.enrollment_id, s.first_name, s.last_name, c.course_name, c.course_code, e.grade, e.enrollment_date
-            FROM enrollments e
-            INNER JOIN students s ON e.student_id = s.student_id
-            INNER JOIN courses c ON e.course_id = c.course_id
-        """)
-        return jsonify({
-            'success': True,
-            'data': result,
-            'count': len(result)
-        })
+        # Avoid SQL JOIN aliases: the parser doesn't support "FROM enrollments e".
+        enr = engine.execute("SELECT * FROM enrollments")
+        stu = engine.execute("SELECT * FROM students")
+        cou = engine.execute("SELECT * FROM courses")
+
+        for r in (enr, stu, cou):
+            if not r.get('success'):
+                return jsonify({'success': False, 'error': r.get('error', 'Query failed')}), 400
+
+        students_by_id = {row.get('student_id'): row for row in stu.get('rows', [])}
+        courses_by_id = {row.get('course_id'): row for row in cou.get('rows', [])}
+
+        enriched = []
+        for row in enr.get('rows', []):
+            student = students_by_id.get(row.get('student_id'), {})
+            course = courses_by_id.get(row.get('course_id'), {})
+            enriched.append({
+                'enrollment_id': row.get('enrollment_id'),
+                'student_id': row.get('student_id'),
+                'course_id': row.get('course_id'),
+                'grade': row.get('grade'),
+                'enrollment_date': row.get('enrollment_date'),
+                'first_name': student.get('first_name'),
+                'last_name': student.get('last_name'),
+                'email': student.get('email'),
+                'course_name': course.get('course_name'),
+                'course_code': course.get('course_code'),
+                'instructor': course.get('instructor'),
+            })
+
+        return jsonify({'success': True, 'data': enriched, 'count': len(enriched)})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -281,14 +372,66 @@ def get_enrollments():
 def create_enrollment():
     """Create a new enrollment"""
     try:
-        data = request.json
+        data = request.json or {}
+        enrollment_id = data.get('enrollment_id')
+        if enrollment_id in (None, ''):
+            enrollment_id = _next_int_id('enrollments', 'enrollment_id')
+        else:
+            enrollment_id = int(enrollment_id)
+
+        student_id = int(data.get('student_id'))
+        course_id = int(data.get('course_id'))
+        grade = _sql_text(data.get('grade', ''))
+        enrollment_date = _sql_text(data.get('enrollment_date', datetime.now().date().isoformat()))
         query = f"""
             INSERT INTO enrollments 
             (enrollment_id, student_id, course_id, grade, enrollment_date) 
-            VALUES ({data['enrollment_id']}, {data['student_id']}, {data['course_id']}, '{data['grade']}', '{data['enrollment_date']}')
+            VALUES ({enrollment_id}, {student_id}, {course_id}, '{grade}', '{enrollment_date}')
         """
-        engine.execute(query)
-        return jsonify({'success': True, 'message': 'Enrollment created'})
+        result = engine.execute(query)
+        if not result.get('success'):
+            return jsonify({'success': False, 'error': result.get('error', 'Insert failed')}), 400
+        return jsonify({'success': True, 'message': 'Enrollment created', 'enrollment_id': enrollment_id})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/enrollments/<int:enrollment_id>', methods=['PUT'])
+def update_enrollment(enrollment_id):
+    """Update an enrollment"""
+    try:
+        data = request.json or {}
+
+        updates = []
+        if 'student_id' in data and data['student_id'] not in (None, ''):
+            updates.append(f"student_id = {int(data['student_id'])}")
+        if 'course_id' in data and data['course_id'] not in (None, ''):
+            updates.append(f"course_id = {int(data['course_id'])}")
+        if 'grade' in data:
+            updates.append(f"grade = '{_sql_text(data.get('grade', ''))}'")
+        if 'enrollment_date' in data and data['enrollment_date'] not in (None, ''):
+            updates.append(f"enrollment_date = '{_sql_text(data['enrollment_date'])}'")
+
+        if not updates:
+            return jsonify({'success': False, 'error': 'No fields to update'}), 400
+
+        query = f"UPDATE enrollments SET {', '.join(updates)} WHERE enrollment_id = {enrollment_id}"
+        result = engine.execute(query)
+        if not result.get('success'):
+            return jsonify({'success': False, 'error': result.get('error', 'Update failed')}), 400
+        return jsonify({'success': True, 'message': 'Enrollment updated'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/enrollments/<int:enrollment_id>', methods=['DELETE'])
+def delete_enrollment(enrollment_id):
+    """Delete an enrollment"""
+    try:
+        result = engine.execute(f"DELETE FROM enrollments WHERE enrollment_id = {enrollment_id}")
+        if not result.get('success'):
+            return jsonify({'success': False, 'error': result.get('error', 'Delete failed')}), 400
+        return jsonify({'success': True, 'message': 'Enrollment deleted'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -299,16 +442,28 @@ def create_enrollment():
 def get_analytics_employees():
     """Fetch employees with department info"""
     try:
-        result = engine.execute("""
-            SELECT e.emp_id, e.name, e.email, e.position, e.salary, d.dept_name, d.location
-            FROM employees e
-            INNER JOIN departments d ON e.dept_id = d.dept_id
-        """)
-        return jsonify({
-            'success': True,
-            'data': result,
-            'count': len(result)
-        })
+        # Avoid SQL JOIN aliases for parser compatibility.
+        emp = engine.execute("SELECT * FROM employees")
+        dep = engine.execute("SELECT * FROM departments")
+        for r in (emp, dep):
+            if not r.get('success'):
+                return jsonify({'success': False, 'error': r.get('error', 'Query failed')}), 400
+
+        departments_by_id = {row.get('dept_id'): row for row in dep.get('rows', [])}
+        enriched = []
+        for row in emp.get('rows', []):
+            d = departments_by_id.get(row.get('dept_id'), {})
+            enriched.append({
+                'emp_id': row.get('emp_id'),
+                'name': row.get('name'),
+                'email': row.get('email'),
+                'position': row.get('position'),
+                'salary': row.get('salary'),
+                'dept_name': d.get('dept_name'),
+                'location': d.get('location'),
+            })
+
+        return jsonify({'success': True, 'data': enriched, 'count': len(enriched)})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -324,10 +479,9 @@ def get_salary_analytics():
             INNER JOIN departments d ON e.dept_id = d.dept_id
             GROUP BY d.dept_id
         """)
-        return jsonify({
-            'success': True,
-            'data': result
-        })
+        if not result.get('success'):
+            return jsonify({'success': False, 'error': result.get('error', 'Query failed')}), 400
+        return jsonify({'success': True, 'data': result.get('rows', [])})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -345,16 +499,16 @@ def execute_sql():
             return jsonify({'success': False, 'error': 'Empty SQL query'}), 400
         
         result = engine.execute(sql)
-        
-        # Determine query type
+        if not result.get('success'):
+            return jsonify({'success': False, 'type': 'ERROR', 'error': result.get('error', 'SQL failed')}), 400
+
         query_type = 'SELECT' if sql.upper().startswith('SELECT') else 'DDL/DML'
-        
         return jsonify({
             'success': True,
             'type': query_type,
-            'rows': result if isinstance(result, list) else [],
-            'count': len(result) if isinstance(result, list) else 0,
-            'message': 'Query executed successfully'
+            'rows': result.get('rows', []),
+            'count': result.get('count', result.get('rows_affected', 0)),
+            'message': result.get('message', 'Query executed successfully')
         })
     except Exception as e:
         return jsonify({

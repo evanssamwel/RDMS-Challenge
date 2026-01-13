@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teacher Portal - School ERP</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        * { font-family: 'Inter', sans-serif; }
+        /* Custom scrollbar for tables */
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="bg-slate-950 text-gray-100" x-data="teacherApp()">
+    
+    <!-- Top Navigation -->
+    <nav class="bg-cyan-900/30 border-b border-cyan-800/50 backdrop-blur-sm sticky top-0 z-50">
+        <div class="px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <div class="w-10 h-10 bg-cyan-600 rounded-lg flex items-center justify-center">
+                        <i data-lucide="graduation-cap" class="w-6 h-6 text-white"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold">Faculty Portal</h1>
+                        <p class="text-xs text-cyan-300">Welcome, {{ user.name }}</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="text-xs text-slate-400 bg-slate-900 px-3 py-1 rounded-full border border-slate-800">
+                        Spring 2026
+                    </span>
+                    <a href="/logout" class="text-sm text-gray-400 hover:text-white transition flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg border border-slate-700">
+                        <i data-lucide="log-out" class="w-4 h-4"></i>
+                        <span>Logout</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+    
+    <main class="max-w-7xl mx-auto p-6 space-y-8">
+        
+        <!-- Stats Row -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- Courses Card -->
+            <div class="bg-slate-900/50 border border-slate-800 rounded-xl p-5 hover:border-cyan-700/50 transition">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-sm text-gray-400">Assigned Courses</p>
+                        <h3 class="text-3xl font-bold mt-1 text-white" x-text="myCourses.length">0</h3>
+                    </div>
+                    <div class="p-2 bg-cyan-900/30 rounded-lg">
+                        <i data-lucide="book-open" class="text-cyan-400 w-6 h-6"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Students Card -->
+            <div class="bg-slate-900/50 border border-slate-800 rounded-xl p-5 hover:border-purple-700/50 transition">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-sm text-gray-400">Total Students</p>
+                        <h3 class="text-3xl font-bold mt-1 text-white" x-text="totalStudents">0</h3>
+                    </div>
+                    <div class="p-2 bg-purple-900/30 rounded-lg">
+                        <i data-lucide="users" class="text-purple-400 w-6 h-6"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Grade Card -->
+            <div class="bg-slate-900/50 border border-slate-800 rounded-xl p-5 hover:border-emerald-700/50 transition">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-sm text-gray-400">Avg Class Performance</p>
+                        <h3 class="text-3xl font-bold mt-1 text-white" x-text="avgPerformance + '%'">0%</h3>
+                    </div>
+                    <div class="p-2 bg-emerald-900/30 rounded-lg">
+                        <i data-lucide="trending-up" class="text-emerald-400 w-6 h-6"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            
+            <!-- Sidebar: Course List -->
+            <div class="lg:col-span-1 space-y-4">
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 h-full">
+                    <h3 class="text-sm font-semibold text-gray-400 uppercase mb-4 tracking-wider">My Classes</h3>
+                    
+                    <div class="space-y-2">
+                        <template x-for="course in myCourses" :key="course.id">
+                            <button 
+                                @click="selectCourse(course)"
+                                :class="selectedCourse?.id === course.id ? 'bg-cyan-900/40 border-cyan-700 text-white' : 'bg-slate-800/50 border-slate-800 text-gray-400 hover:bg-slate-800'"
+                                class="w-full text-left p-3 rounded-lg border transition flex flex-col group">
+                                <span class="text-sm font-bold truncate" x-text="course.code"></span>
+                                <span class="text-xs truncate opacity-80" x-text="course.title"></span>
+                            </button>
+                        </template>
+
+                        <div x-show="myCourses.length === 0" class="text-center py-8 text-gray-500 text-sm">
+                            <i data-lucide="loader-2" class="w-6 h-6 animate-spin mx-auto mb-2"></i>
+                            Loading courses...
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Panel: Gradebook / Details -->
+            <div class="lg:col-span-3">
+                <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 min-h-[500px]">
+                    
+                    <!-- Header -->
+                    <div class="flex flex-col md:flex-row md:items-center justify-between mb-6 pb-6 border-b border-slate-800">
+                        <div>
+                            <h2 class="text-2xl font-bold text-white flex items-center space-x-2">
+                                <span x-text="selectedCourse ? selectedCourse.title : 'Select a Course'"></span>
+                                <span x-show="selectedCourse" class="text-sm bg-slate-800 text-gray-400 px-2 py-1 rounded ml-2" x-text="selectedCourse?.code"></span>
+                            </h2>
+                            <p class="text-gray-400 text-sm mt-1" x-text="selectedCourse ? 'Manage student grades and performance.' : 'Choose a class from the sidebar to view enrollment details.'"></p>
+                        </div>
+                        
+                        <div x-show="selectedCourse" class="flex space-x-2 mt-4 md:mt-0">
+                            <button @click="fetchEnrollments(selectedCourse.id)" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm text-white transition flex items-center space-x-2">
+                                <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                                <span>Refresh</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Empty State -->
+                    <div x-show="!selectedCourse" class="text-center py-20 opacity-50">
+                        <i data-lucide="arrow-left" class="w-12 h-12 mx-auto mb-4 text-cyan-500"></i>
+                        <h3 class="text-lg font-medium text-white">Your Gradebook is ready</h3>
+                        <p class="text-gray-400 text-sm">Select a course to start grading.</p>
+                    </div>
+
+                    <!-- Gradebook Table -->
+                    <div x-show="selectedCourse" class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="text-xs font-semibold text-gray-500 bg-slate-950/50 uppercase tracking-wider border-b border-slate-800">
+                                    <th class="p-4">Student</th>
+                                    <th class="p-4">Midterm (40%)</th>
+                                    <th class="p-4">Final (60%)</th>
+                                    <th class="p-4">Total</th>
+                                    <th class="p-4">Grade</th>
+                                    <th class="p-4 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-800">
+                                <template x-for="enrollment in enrollments" :key="enrollment.id">
+                                    <tr class="hover:bg-slate-800/30 transition group">
+                                        <td class="p-4">
+                                            <div class="font-medium text-white" x-text="enrollment.student_name"></div>
+                                            <div class="text-xs text-gray-500 text-ellipsis break-all" x-text="enrollment.email || 'student@school.edu'"></div>
+                                        </td>
+                                        <td class="p-4">
+                                            <input type="number" x-model="enrollment.midterm_score" 
+                                                @input="calcGrade(enrollment)"
+                                                class="w-20 bg-slate-950 border border-slate-700 rounded p-1.5 text-center text-sm focus:border-cyan-500 outline-none transition" max="100" min="0">
+                                        </td>
+                                        <td class="p-4">
+                                            <input type="number" x-model="enrollment.final_score" 
+                                                @input="calcGrade(enrollment)"
+                                                class="w-20 bg-slate-950 border border-slate-700 rounded p-1.5 text-center text-sm focus:border-cyan-500 outline-none transition" max="100" min="0">
+                                        </td>
+                                        <td class="p-4 font-mono text-cyan-400" x-text="((Number(enrollment.midterm_score) + Number(enrollment.final_score))/2).toFixed(1)"></td>
+                                        <td class="p-4">
+                                            <span :class="getGradeColor(enrollment.grade)" 
+                                                  class="px-2 py-1 rounded text-xs font-bold w-8 inline-block text-center"
+                                                  x-text="enrollment.grade"></span>
+                                        </td>
+                                        <td class="p-4 text-right">
+                                            <button @click="saveGrade(enrollment)" 
+                                                class="text-xs bg-cyan-600 hover:bg-cyan-500 text-white px-3 py-1.5 rounded transition shadow-lg shadow-cyan-900/20">
+                                                Save
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </template>
+                                
+                                <tr x-show="enrollments.length === 0">
+                                    <td colspan="6" class="p-8 text-center text-gray-500">
+                                        No students enrolled yet.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="toast" class="fixed bottom-4 right-4 bg-slate-800 text-white px-4 py-3 rounded-lg shadow-xl border border-slate-700 transform translate-y-20 opacity-0 transition duration-300 flex items-center space-x-3 z-50">
+        <i data-lucide="check-circle" class="text-green-500 w-5 h-5"></i>
+        <span id="toastMsg">Action successful</span>
+    </div>
+
+    <script>
+        const CURRENT_USER_ID = {{ user.id }};
+
+        function teacherApp() {
+            return {
+                myCourses: [],
+                selectedCourse: null,
+                enrollments: [],
+                totalStudents: 0,
+                avgPerformance: 0,
+
+                async init() {
+                    lucide.createIcons();
+                    await this.fetchMyCourses();
+                },
+
+                async fetchMyCourses() {
+                    try {
+                        // In a real app we'd filter on the server, but for this demo fetching all courses is fine (dataset < 100)
+                        const res = await fetch('/api/courses');
+                        const data = await res.json();
+                        
+                        // Filter for this teacher
+                        this.myCourses = data.filter(c => c.teacher_id == CURRENT_USER_ID);
+                        
+                        if (this.myCourses.length > 0) {
+                            this.selectCourse(this.myCourses[0]);
+                        }
+                    } catch (e) {
+                        console.error("Error fetching courses:", e);
+                    }
+                },
+
+                async selectCourse(course) {
+                    this.selectedCourse = course;
+                    await this.fetchEnrollments(course.id);
+                },
+
+                async fetchEnrollments(courseId) {
+                    try {
+                        const res = await fetch(`/api/enrollments?course_id=${courseId}`);
+                        const data = await res.json();
+                        this.enrollments = data;
+                        
+                        // Update stats
+                        this.calcStats();
+                        
+                        // Re-init generic icons if rows added
+                        this.$nextTick(() => lucide.createIcons());
+                    } catch (e) {
+                        console.error("Error details:", e);
+                    }
+                },
+
+                calcStats() {
+                    // Simple stats calculation based on current view + rough estimates
+                    // Total unique students across all my courses would require more API calls, 
+                    // so we'll just sum active enrollment counts for now for the visuals
+                    let total = 0;
+                    let totalScore = 0;
+                    let count = 0;
+                    
+                    if(this.enrollments.length > 0) {
+                        this.enrollments.forEach(e => {
+                            total++;
+                            const avg = (parseFloat(e.midterm_score) + parseFloat(e.final_score)) / 2;
+                            if(!isNaN(avg)) {
+                                totalScore += avg;
+                                count++;
+                            }
+                        });
+                    }
+                    
+                    // Update global stats
+                    this.totalStudents = total; // This is per course currently, acceptable for demo
+                    this.avgPerformance = count > 0 ? (totalScore / count).toFixed(1) : 0;
+                },
+
+                calcGrade(enrollment) {
+                    const mid = parseFloat(enrollment.midterm_score) || 0;
+                    const final = parseFloat(enrollment.final_score) || 0;
+                    const avg = (mid + final) / 2;
+                    
+                    if (avg >= 90) enrollment.grade = 'A';
+                    else if (avg >= 80) enrollment.grade = 'B';
+                    else if (avg >= 70) enrollment.grade = 'C';
+                    else if (avg >= 60) enrollment.grade = 'D';
+                    else enrollment.grade = 'F';
+                },
+
+                getGradeColor(grade) {
+                    const colors = {
+                        'A': 'bg-green-900/50 text-green-400 border border-green-800',
+                        'B': 'bg-blue-900/50 text-blue-400 border border-blue-800',
+                        'C': 'bg-yellow-900/50 text-yellow-400 border border-yellow-800',
+                        'D': 'bg-orange-900/50 text-orange-400 border border-orange-800',
+                        'F': 'bg-red-900/50 text-red-400 border border-red-800',
+                        'N/A': 'bg-gray-800 text-gray-400'
+                    };
+                    return colors[grade] || colors['N/A'];
+                },
+
+                async saveGrade(enrollment) {
+                    try {
+                        this.calcGrade(enrollment); // Ensure grade is synced
+                        
+                        const res = await fetch(`/api/enrollments/${enrollment.id}/grade`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                grade: enrollment.grade,
+                                midterm_score: parseFloat(enrollment.midterm_score),
+                                final_score: parseFloat(enrollment.final_score)
+                            })
+                        });
+                        
+                        const result = await res.json();
+                        if (result.success) {
+                            this.showToast(`Grade saved for ${enrollment.student_name}`);
+                        } else {
+                            alert('Error saving grade');
+                        }
+                    } catch (e) {
+                        alert('Network Error');
+                    }
+                },
+
+                showToast(msg) {
+                    const toast = document.getElementById('toast');
+                    document.getElementById('toastMsg').innerText = msg;
+                    toast.classList.remove('translate-y-20', 'opacity-0');
+                    setTimeout(() => {
+                        toast.classList.add('translate-y-20', 'opacity-0');
+                    }, 3000);
+                }
+            }
+        }
+    </script>
+</body>
+</html>

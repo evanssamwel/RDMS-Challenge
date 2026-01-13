@@ -4,7 +4,7 @@ A feature-rich school management system demonstrating complex RDBMS operations
 Showcases multi-table relationships, foreign keys, aggregates, and real-world business logic
 """
 
-from flask import Flask, render_template, request, jsonify, session
+from flask import Flask, render_template, request, jsonify, session, redirect
 import sys
 import os
 from datetime import datetime, timedelta
@@ -18,9 +18,38 @@ from core.storage import Storage
 app = Flask(__name__)
 app.secret_key = 'school-erp-simplesqldb-2026'
 
-# Initialize database
-storage = Storage(data_dir='school_data')
+# Demo Credentials
+DEMO_USERS = {
+    'admin@school.edu': {'password': 'admin123', 'role': 'Admin', 'name': 'System Administrator', 'id': 99991},
+    'teacher@school.edu': {'password': 'teacher123', 'role': 'Teacher', 'name': 'Prof. John Doe', 'id': 99992},
+    'student@school.edu': {'password': 'student123', 'role': 'Student', 'name': 'Alice Smith', 'id': 99993},
+    'registrar@school.edu': {'password': 'registrar123', 'role': 'Registrar', 'name': 'Jane Official', 'id': 99994}
+}
+
+# Initialize database ("database" == a folder, like MariaDB databases)
+DB_NAME = 'school_erp'
+DB_DIR = os.path.join('databases', DB_NAME)
+storage = Storage(data_dir=DB_DIR)
 engine = QueryEngine(storage)
+
+
+def db_exec(sql: str) -> dict:
+    """Execute SQL and raise on failure (QueryEngine.execute returns a dict)."""
+    result = engine.execute(sql)
+    if isinstance(result, dict) and result.get('success') is False:
+        raise ValueError(result.get('error') or 'SQL execution failed')
+    return result
+
+
+def db_rows(sql: str):
+    """Execute a SELECT and return rows list (empty list on no rows)."""
+    result = engine.execute(sql)
+    if isinstance(result, dict):
+        if result.get('success') is False:
+            raise ValueError(result.get('error') or 'SQL query failed')
+        return result.get('rows') or []
+    # Backward-compat (if engine ever returns raw rows)
+    return result or []
 
 # Track initialization status
 system_initialized = False
@@ -32,11 +61,35 @@ def init_school_database():
     
     if system_initialized:
         return
+
+    # If tables already exist on disk, don't recreate; just ensure auth tables exist.
+    if storage.get_table('users') is not None:
+        if storage.get_table('auth_users') is None:
+            try:
+                db_exec("""
+                    CREATE TABLE auth_users (
+                        id INT PRIMARY KEY,
+                        user_id INT,
+                        name VARCHAR(100),
+                        email VARCHAR(100) UNIQUE,
+                        password VARCHAR(100),
+                        role VARCHAR(20),
+                        created_at VARCHAR(50)
+                    )
+                """)
+                db_exec("CREATE INDEX idx_auth_email ON auth_users (email)")
+                db_exec("CREATE INDEX idx_auth_role ON auth_users (role)")
+            except Exception:
+                pass
+
+        system_initialized = True
+        ensure_demo_data()
+        return
     
     print("🏫 Initializing School Management ERP Database...")
     
     # Users Table (Students, Teachers, Admins)
-    engine.execute("""
+    db_exec("""
         CREATE TABLE users (
             id INT PRIMARY KEY,
             name VARCHAR(100),
@@ -48,9 +101,22 @@ def init_school_database():
             enrollment_date DATE
         )
     """)
+
+    # Auth Users Table (Login credentials + roles)
+    db_exec("""
+        CREATE TABLE auth_users (
+            id INT PRIMARY KEY,
+            user_id INT,
+            name VARCHAR(100),
+            email VARCHAR(100) UNIQUE,
+            password VARCHAR(100),
+            role VARCHAR(20),
+            created_at VARCHAR(50)
+        )
+    """)
     
     # Courses Table
-    engine.execute("""
+    db_exec("""
         CREATE TABLE courses (
             id INT PRIMARY KEY,
             title VARCHAR(150),
@@ -65,7 +131,7 @@ def init_school_database():
     """)
     
     # Enrollments Table (Many-to-Many: Students ↔ Courses)
-    engine.execute("""
+    db_exec("""
         CREATE TABLE enrollments (
             id INT PRIMARY KEY,
             student_id INT,
@@ -79,7 +145,7 @@ def init_school_database():
     """)
     
     # Financials Table
-    engine.execute("""
+    db_exec("""
         CREATE TABLE financials (
             id INT PRIMARY KEY,
             student_id INT,
@@ -93,7 +159,7 @@ def init_school_database():
     """)
     
     # Attendance Table
-    engine.execute("""
+    db_exec("""
         CREATE TABLE attendance (
             id INT PRIMARY KEY,
             student_id INT,
@@ -105,7 +171,7 @@ def init_school_database():
     """)
     
     # Library Table (Books)
-    engine.execute("""
+    db_exec("""
         CREATE TABLE books (
             id INT PRIMARY KEY,
             title VARCHAR(200),
@@ -119,7 +185,7 @@ def init_school_database():
     """)
     
     # Book Borrowings Table (Many-to-Many: Students ↔ Books)
-    engine.execute("""
+    db_exec("""
         CREATE TABLE borrowings (
             id INT PRIMARY KEY,
             student_id INT,
@@ -133,7 +199,7 @@ def init_school_database():
     """)
     
     # Exams Table
-    engine.execute("""
+    db_exec("""
         CREATE TABLE exams (
             id INT PRIMARY KEY,
             course_id INT,
@@ -146,7 +212,7 @@ def init_school_database():
     """)
     
     # Departments Table
-    engine.execute("""
+    db_exec("""
         CREATE TABLE departments (
             id INT PRIMARY KEY,
             name VARCHAR(100),
@@ -157,7 +223,7 @@ def init_school_database():
     """)
     
     # System Logs Table (for live feed)
-    engine.execute("""
+    db_exec("""
         CREATE TABLE system_logs (
             id INT PRIMARY KEY,
             timestamp VARCHAR(50),
@@ -169,15 +235,165 @@ def init_school_database():
     """)
     
     # Create indexes for performance
-    engine.execute("CREATE INDEX idx_users_role ON users (role)")
-    engine.execute("CREATE INDEX idx_enrollments_student ON enrollments (student_id)")
-    engine.execute("CREATE INDEX idx_enrollments_course ON enrollments (course_id)")
-    engine.execute("CREATE INDEX idx_attendance_student ON attendance (student_id)")
-    engine.execute("CREATE INDEX idx_financials_student ON financials (student_id)")
-    engine.execute("CREATE INDEX idx_borrowings_student ON borrowings (student_id)")
+    db_exec("CREATE INDEX idx_users_role ON users (role)")
+    db_exec("CREATE INDEX idx_auth_email ON auth_users (email)")
+    db_exec("CREATE INDEX idx_auth_role ON auth_users (role)")
+    db_exec("CREATE INDEX idx_enrollments_student ON enrollments (student_id)")
+    db_exec("CREATE INDEX idx_enrollments_course ON enrollments (course_id)")
+    db_exec("CREATE INDEX idx_attendance_student ON attendance (student_id)")
+    db_exec("CREATE INDEX idx_financials_student ON financials (student_id)")
+    db_exec("CREATE INDEX idx_borrowings_student ON borrowings (student_id)")
     
-    print("✅ School ERP Database initialized with 10 tables and 6 indexes")
+    print("✅ School ERP Database initialized (tables + indexes ready)")
     system_initialized = True
+    ensure_demo_data()
+
+
+def ensure_demo_data():
+    """Ensure demo users and relationships exist for a feasibility"""
+    print("🔧 Verifying Demo Data Integrity...")
+    
+    # 0. Ensure Admin and Registrar exist
+    admin = DEMO_USERS['admin@school.edu']
+    res = db_rows("SELECT id FROM users WHERE email = 'admin@school.edu'")
+    if not res:
+        print(f"Creating Demo Admin: {admin['name']}")
+        try:
+            db_exec(f"""
+                INSERT INTO users (id, name, email, role, phone, address, date_of_birth, enrollment_date)
+                VALUES ({admin['id']}, '{admin['name']}', 'admin@school.edu', 'Admin', 
+                        '+254700000001', 'Admin Block', '1980-01-01', '{datetime.now().strftime('%Y-%m-%d')}')
+            """)
+        except Exception:
+            pass
+
+    auth = db_rows(f"SELECT id FROM auth_users WHERE email = 'admin@school.edu'")
+    if not auth:
+        try:
+            db_exec(f"""
+                INSERT INTO auth_users (id, user_id, name, email, password, role, created_at)
+                VALUES ({admin['id']}, {admin['id']}, '{admin['name']}', 'admin@school.edu', '{admin['password']}', 'Admin', '{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}')
+            """)
+        except Exception:
+            pass
+
+    registrar = DEMO_USERS['registrar@school.edu']
+    res = db_rows("SELECT id FROM users WHERE email = 'registrar@school.edu'")
+    if not res:
+        print(f"Creating Demo Registrar: {registrar['name']}")
+        try:
+            db_exec(f"""
+                INSERT INTO users (id, name, email, role, phone, address, date_of_birth, enrollment_date)
+                VALUES ({registrar['id']}, '{registrar['name']}', 'registrar@school.edu', 'Registrar', 
+                        '+254700000004', 'Admin Block', '1982-01-01', '{datetime.now().strftime('%Y-%m-%d')}')
+            """)
+        except Exception:
+            pass
+
+    auth = db_rows(f"SELECT id FROM auth_users WHERE email = 'registrar@school.edu'")
+    if not auth:
+        try:
+            db_exec(f"""
+                INSERT INTO auth_users (id, user_id, name, email, password, role, created_at)
+                VALUES ({registrar['id']}, {registrar['id']}, '{registrar['name']}', 'registrar@school.edu', '{registrar['password']}', 'Registrar', '{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}')
+            """)
+        except Exception:
+            pass
+
+    # 1. Ensure Demo Teacher exists
+    teacher = DEMO_USERS['teacher@school.edu']
+    res = db_rows("SELECT id FROM users WHERE email = 'teacher@school.edu'")
+    if not res:
+        print(f"Creating Demo Teacher: {teacher['name']}")
+        try:
+            db_exec(f"""
+                INSERT INTO users (id, name, email, role, phone, address, date_of_birth, enrollment_date)
+                VALUES ({teacher['id']}, '{teacher['name']}', 'teacher@school.edu', 'Teacher', 
+                        '+254700000002', 'Staff Quarters School', '1985-05-15', '{datetime.now().strftime('%Y-%m-%d')}')
+            """)
+        except Exception:
+            pass
+
+    auth = db_rows(f"SELECT id FROM auth_users WHERE email = 'teacher@school.edu'")
+    if not auth:
+        try:
+            db_exec(f"""
+                INSERT INTO auth_users (id, user_id, name, email, password, role, created_at)
+                VALUES ({teacher['id']}, {teacher['id']}, '{teacher['name']}', 'teacher@school.edu', '{teacher['password']}', 'Teacher', '{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}')
+            """)
+        except Exception:
+            pass
+
+    # 2. Ensure Demo Student exists
+    student = DEMO_USERS['student@school.edu']
+    res = db_rows("SELECT id FROM users WHERE email = 'student@school.edu'")
+    if not res:
+        print(f"Creating Demo Student: {student['name']}")
+        try:
+            db_exec(f"""
+                INSERT INTO users (id, name, email, role, phone, address, date_of_birth, enrollment_date)
+                VALUES ({student['id']}, '{student['name']}', 'student@school.edu', 'Student', 
+                        '+254700000003', 'Dormitory A', '2005-08-20', '{datetime.now().strftime('%Y-%m-%d')}')
+            """)
+        except Exception:
+            pass
+
+    auth = db_rows(f"SELECT id FROM auth_users WHERE email = 'student@school.edu'")
+    if not auth:
+        try:
+            db_exec(f"""
+                INSERT INTO auth_users (id, user_id, name, email, password, role, created_at)
+                VALUES ({student['id']}, {student['id']}, '{student['name']}', 'student@school.edu', '{student['password']}', 'Student', '{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}')
+            """)
+        except Exception:
+            pass
+        
+    # 3. Assign 3 random courses to Demo Teacher (if they have none)
+    my_courses = db_rows(f"SELECT id FROM courses WHERE teacher_id = {teacher['id']}")
+    if not my_courses:
+        print("Assigning courses to Demo Teacher...")
+        # Get 3 course IDs
+        courses = db_rows("SELECT id FROM courses LIMIT 3")
+        for c in courses:
+            db_exec(f"UPDATE courses SET teacher_id = {teacher['id']} WHERE id = {c['id']}")
+
+    # 4. Enroll Demo Student in Demo Teacher's courses (if not enrolled)
+    my_courses = db_rows(f"SELECT id FROM courses WHERE teacher_id = {teacher['id']}")
+    for c in my_courses:
+        enrollment = db_rows(f"SELECT id FROM enrollments WHERE student_id = {student['id']} AND course_id = {c['id']}")
+        if not enrollment:
+            print(f"Enrolling Demo Student in Course {c['id']}...")
+            eid = random.randint(100000, 999999)
+            db_exec(f"""
+                INSERT INTO enrollments (id, student_id, course_id, grade, enrollment_date, status, midterm_score, final_score)
+                VALUES ({eid}, {student['id']}, {c['id']}, 'B', '2024-01-15', 'Active', 75.5, 82.0)
+            """)
+    
+    # 5. Ensure plenty of students in Demo Teacher's courses (for Gradebook demo)
+    # Get all students
+    all_students_res = db_rows("SELECT id FROM users WHERE role = 'Student' LIMIT 50")
+    if all_students_res:
+        all_students = [s['id'] for s in all_students_res]
+        for c in my_courses:
+            # Check enrollment count
+            count_res = db_rows(f"SELECT COUNT(*) as cnt FROM enrollments WHERE course_id = {c['id']}")
+            count = count_res[0]['cnt'] if count_res else 0
+            if count < 5:
+                # Add 10 random students
+                print(f"Populating Course {c['id']} with random students...")
+                target_students = random.sample(all_students, min(10, len(all_students)))
+                for sid in target_students:
+                    # Check if already enrolled
+                    check = db_rows(f"SELECT id FROM enrollments WHERE student_id = {sid} AND course_id = {c['id']}")
+                    if not check:
+                        eid = random.randint(100000, 999999)
+                        grade = random.choice(['A', 'B', 'C', 'D', 'F'])
+                        mid = random.uniform(40, 99)
+                        fin = random.uniform(40, 99)
+                        db_exec(f"""
+                            INSERT INTO enrollments (id, student_id, course_id, grade, enrollment_date, status, midterm_score, final_score)
+                            VALUES ({eid}, {sid}, {c['id']}, '{grade}', '2024-01-15', 'Active', {mid:.1f}, {fin:.1f})
+                        """)
 
 
 def log_action(user_role, action, sql_command, status="SUCCESS"):
@@ -201,42 +417,98 @@ def log_action(user_role, action, sql_command, status="SUCCESS"):
 
 @app.route('/')
 def index():
-    """School ERP Homepage with role switcher"""
+    """School ERP Login Page"""
     if not system_initialized:
         init_school_database()
-    return render_template('school/index.html')
+        
+    # If already logged in, redirect to appropriate dashboard
+    if 'user' in session:
+        role = session['user']['role']
+        if role == 'Admin': return redirect('/admin')
+        if role == 'Teacher': return redirect('/teacher')
+        if role == 'Student': return redirect('/student')
+        if role == 'Registrar': return redirect('/registrar')
+        
+    return render_template('school/login.html')
+
+
+@app.route('/login', methods=['POST'])
+def login():
+    """Handle login authentication"""
+    data = request.json
+    email = data.get('email')
+    password = data.get('password')
+
+    # 1) DB-backed auth (MariaDB-like: credentials live in auth_users table)
+    try:
+        sql = f"SELECT user_id, name, email, role FROM auth_users WHERE email = '{email}' AND password = '{password}'"
+        rows = db_rows(sql)
+        if rows:
+            row = rows[0]
+            user_obj = {
+                'id': row['user_id'],
+                'name': row['name'],
+                'email': row['email'],
+                'role': row['role']
+            }
+            session['user'] = user_obj
+            log_action(row['role'], "Login", f"User {email} logged in via DB")
+            return jsonify({"success": True, "role": row['role']})
+    except Exception as e:
+        print(f"Login DB error: {e}")
+
+    # 2) Fallback demo users (only if DB isn't ready)
+    if email in DEMO_USERS and DEMO_USERS[email]['password'] == password:
+        demo = DEMO_USERS[email].copy()
+        demo['email'] = email
+        session['user'] = demo
+        log_action(DEMO_USERS[email]['role'], "Login", f"User {email} logged in (Demo Fallback)")
+        return jsonify({"success": True, "role": DEMO_USERS[email]['role']})
+    
+    return jsonify({"success": False, "error": "Invalid email or password"}), 401
+
+
+@app.route('/logout')
+def logout():
+    """Clear session and redirect to login"""
+    session.pop('user', None)
+    return redirect('/')
 
 
 @app.route('/admin')
 def admin_dashboard():
     """Admin Dashboard - Full CRUD access"""
-    if not system_initialized:
-        init_school_database()
-    return render_template('school/admin.html')
+    if not system_initialized: init_school_database()
+    if 'user' not in session or session['user']['role'] != 'Admin':
+        return redirect('/')
+    return render_template('school/admin.html', user=session['user'])
 
 
 @app.route('/teacher')
 def teacher_dashboard():
     """Teacher Dashboard - Grade management"""
-    if not system_initialized:
-        init_school_database()
-    return render_template('school/teacher.html')
+    if not system_initialized: init_school_database()
+    if 'user' not in session or session['user']['role'] != 'Teacher':
+        return redirect('/')
+    return render_template('school/teacher.html', user=session['user'])
 
 
 @app.route('/student')
 def student_dashboard():
     """Student Dashboard - View only"""
-    if not system_initialized:
-        init_school_database()
-    return render_template('school/student.html')
+    if not system_initialized: init_school_database()
+    if 'user' not in session or session['user']['role'] != 'Student':
+        return redirect('/')
+    return render_template('school/student.html', user=session['user'])
 
 
 @app.route('/registrar')
 def registrar_dashboard():
     """Registrar Dashboard - Advanced Analytics"""
-    if not system_initialized:
-        init_school_database()
-    return render_template('school/registrar.html')
+    if not system_initialized: init_school_database()
+    if 'user' not in session or session['user']['role'] != 'Registrar':
+        return redirect('/')
+    return render_template('school/registrar.html', user=session['user'])
 
 
 # ============ API ENDPOINTS ============
@@ -247,12 +519,13 @@ def get_users():
     role = request.args.get('role', '')
     
     if role:
-        result = engine.execute(f"SELECT * FROM users WHERE role = '{role}'")
+        sql = f"SELECT * FROM users WHERE role = '{role}'"
     else:
-        result = engine.execute("SELECT * FROM users")
-    
-    log_action("API", "Fetch Users", f"SELECT * FROM users WHERE role = '{role}'")
-    return jsonify(result)
+        sql = "SELECT * FROM users"
+
+    rows = db_rows(sql)
+    log_action("API", "Fetch Users", sql)
+    return jsonify(rows)
 
 
 @app.route('/api/users', methods=['POST'])
@@ -269,7 +542,7 @@ def create_user():
     """
     
     try:
-        engine.execute(sql)
+        db_exec(sql)
         log_action(data['role'], "Create User", sql)
         return jsonify({"success": True, "id": user_id, "message": "User created successfully"})
     except Exception as e:
@@ -290,7 +563,7 @@ def update_user(user_id):
     """
     
     try:
-        engine.execute(sql)
+        db_exec(sql)
         log_action("Admin", "Update User", sql)
         return jsonify({"success": True, "message": "User updated successfully"})
     except Exception as e:
@@ -304,7 +577,7 @@ def delete_user(user_id):
     sql = f"DELETE FROM users WHERE id = {user_id}"
     
     try:
-        engine.execute(sql)
+        db_exec(sql)
         log_action("Admin", "Delete User", sql)
         return jsonify({"success": True, "message": "User deleted successfully"})
     except Exception as e:
@@ -315,9 +588,10 @@ def delete_user(user_id):
 @app.route('/api/courses', methods=['GET'])
 def get_courses():
     """Get all courses"""
-    result = engine.execute("SELECT * FROM courses")
-    log_action("API", "Fetch Courses", "SELECT * FROM courses")
-    return jsonify(result)
+    sql = "SELECT * FROM courses"
+    rows = db_rows(sql)
+    log_action("API", "Fetch Courses", sql)
+    return jsonify(rows)
 
 
 @app.route('/api/courses', methods=['POST'])
@@ -334,7 +608,7 @@ def create_course():
     """
     
     try:
-        engine.execute(sql)
+        db_exec(sql)
         log_action("Admin", "Create Course", sql)
         return jsonify({"success": True, "id": course_id, "message": "Course created successfully"})
     except Exception as e:
@@ -375,9 +649,9 @@ def get_enrollments():
             LIMIT 100
         """
     
-    result = engine.execute(sql)
+    rows = db_rows(sql)
     log_action("API", "Fetch Enrollments", sql)
-    return jsonify(result)
+    return jsonify(rows)
 
 
 @app.route('/api/enrollments', methods=['POST'])
@@ -393,7 +667,7 @@ def create_enrollment():
     """
     
     try:
-        engine.execute(sql)
+        db_exec(sql)
         log_action("Admin", "Create Enrollment", sql)
         return jsonify({"success": True, "id": enrollment_id, "message": "Enrollment created successfully"})
     except Exception as e:
@@ -415,7 +689,7 @@ def update_grade(enrollment_id):
     """
     
     try:
-        engine.execute(sql)
+        db_exec(sql)
         log_action("Teacher", "Update Grade", sql)
         return jsonify({"success": True, "message": "Grade updated successfully"})
     except Exception as e:
@@ -436,9 +710,9 @@ def get_top_performers():
         LIMIT 10
     """
     
-    result = engine.execute(sql)
+    rows = db_rows(sql)
     log_action("Registrar", "Analytics - Top Performers", sql)
-    return jsonify(result)
+    return jsonify(rows)
 
 
 @app.route('/api/analytics/financial-summary', methods=['GET'])
@@ -454,9 +728,9 @@ def get_financial_summary():
         FROM financials
     """
     
-    result = engine.execute(sql)
+    rows = db_rows(sql)
     log_action("Registrar", "Analytics - Financial Summary", sql)
-    return jsonify(result)
+    return jsonify(rows)
 
 
 @app.route('/api/analytics/attendance-rate', methods=['GET'])
@@ -470,9 +744,9 @@ def get_attendance_rate():
         FROM attendance
     """
     
-    result = engine.execute(sql)
+    rows = db_rows(sql)
     log_action("Registrar", "Analytics - Attendance Rate", sql)
-    return jsonify(result)
+    return jsonify(rows)
 
 
 @app.route('/api/analytics/course-enrollment', methods=['GET'])
@@ -488,9 +762,9 @@ def get_course_enrollment():
         ORDER BY enrolled_students DESC
     """
     
-    result = engine.execute(sql)
+    rows = db_rows(sql)
     log_action("Registrar", "Analytics - Course Enrollment", sql)
-    return jsonify(result)
+    return jsonify(rows)
 
 
 @app.route('/api/financials', methods=['GET'])
@@ -513,9 +787,9 @@ def get_financials():
             LIMIT 100
         """
     
-    result = engine.execute(sql)
+    rows = db_rows(sql)
     log_action("API", "Fetch Financials", sql)
-    return jsonify(result)
+    return jsonify(rows)
 
 
 @app.route('/api/attendance', methods=['GET'])
@@ -552,17 +826,18 @@ def get_attendance():
             LIMIT 100
         """
     
-    result = engine.execute(sql)
+    rows = db_rows(sql)
     log_action("API", "Fetch Attendance", sql)
-    return jsonify(result)
+    return jsonify(rows)
 
 
 @app.route('/api/library/books', methods=['GET'])
 def get_books():
     """Get library books"""
-    result = engine.execute("SELECT * FROM books")
-    log_action("API", "Fetch Books", "SELECT * FROM books")
-    return jsonify(result)
+    sql = "SELECT * FROM books"
+    rows = db_rows(sql)
+    log_action("API", "Fetch Books", sql)
+    return jsonify(rows)
 
 
 @app.route('/api/library/borrowings', methods=['GET'])
@@ -589,20 +864,21 @@ def get_borrowings():
             LIMIT 100
         """
     
-    result = engine.execute(sql)
+    rows = db_rows(sql)
     log_action("API", "Fetch Borrowings", sql)
-    return jsonify(result)
+    return jsonify(rows)
 
 
 @app.route('/api/system-logs', methods=['GET'])
 def get_system_logs():
     """Get recent system logs for live feed"""
-    result = engine.execute("""
+    sql = """
         SELECT * FROM system_logs 
         ORDER BY timestamp DESC 
         LIMIT 20
-    """)
-    return jsonify(result)
+    """
+    rows = db_rows(sql)
+    return jsonify(rows)
 
 
 @app.route('/api/execute', methods=['POST'])
@@ -662,7 +938,7 @@ def bulk_import_students():
                         '{student.get('phone', '')}', '{student.get('address', '')}',
                         '{student.get('date_of_birth', '2005-01-01')}', '{datetime.now().strftime('%Y-%m-%d')}')
             """
-            engine.execute(sql)
+            db_exec(sql)
             success_count += 1
         except Exception as e:
             errors.append({"student": student['name'], "error": str(e)})
@@ -680,8 +956,8 @@ def bulk_import_students():
 @app.route('/api/schema', methods=['GET'])
 def get_schema():
     """Get database schema information"""
-    result = engine.execute("SELECT * FROM .sys_tables")
-    return jsonify(result)
+    rows = db_rows("SELECT * FROM .sys_tables")
+    return jsonify(rows)
 
 
 if __name__ == '__main__':
