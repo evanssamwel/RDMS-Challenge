@@ -149,6 +149,12 @@ def init_databases():
 
 @app.route('/')
 def index():
+    """Render the gateway homepage with entry points"""
+    return render_template('index.html')
+
+
+@app.route('/studio')
+def studio():
     """Render the main studio dashboard"""
     if not engine_status['initialized']:
         init_databases()
