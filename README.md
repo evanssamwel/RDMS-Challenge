@@ -2,7 +2,38 @@
 
 **Pesapal Junior Dev Challenge 2026**
 
-SimpleSQLDB is a fully functional relational database management system (RDBMS) built from scratch in Python. It features SQL query support, B-tree indexing, JOIN operations, and a web-based demo application showcasing CRUD operations.
+SimpleSQLDB is a fully functional relational database management system (RDBMS) built from scratch in Python. It features SQL query support, B-tree indexing, JOIN operations, and a professional web-based dashboard showcasing CRUD operations.
+
+## 🏗️ Architecture: Professional Separation of Concerns
+
+SimpleSQLDB demonstrates **enterprise-grade N-Tier Architecture** with strict separation of concerns:
+
+```
+┌─────────────────────────────────────────────┐
+│     Presentation Layer (Multiple)            │
+│  ┌──────────────────┐  ┌────────────────┐  │
+│  │   CLI/REPL       │  │   Web Studio   │  │
+│  │   (repl/cli.py)  │  │  (web_demo/)   │  │
+│  └──────────────────┘  └────────────────┘  │
+└─────────────────────────────────────────────┘
+              ↓ Public API
+┌─────────────────────────────────────────────┐
+│     Core RDBMS Engine (Independent)         │
+│  Parser → Engine → Aggregates → Indexing   │
+└─────────────────────────────────────────────┘
+              ↓ File I/O
+┌─────────────────────────────────────────────┐
+│     Persistence Layer (JSON + B-Tree)      │
+└─────────────────────────────────────────────┘
+```
+
+**Key Insight:** The RDBMS engine is completely independent and can be used via:
+- **CLI Interface** (repl/cli.py)
+- **Web Application** (web_demo/app_studio.py)  
+- **Direct Python API** (import core.engine)
+- **Any custom application**
+
+→ **Read [ARCHITECTURE.md](ARCHITECTURE.md) for detailed design documentation**
 
 ## 🌟 Features
 
@@ -58,24 +89,49 @@ RDMS/
 - Python 3.8 or higher
 - pip (Python package installer)
 
-### Installation
+### Installation & Quick Start
 
-1. **Clone or download this repository**
-   ```powershell
-   cd "c:\Users\E.Samwel\Desktop\RDMS"
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/evanssamwel/RDMS-Challenge.git
+   cd RDMS-Challenge
    ```
 
 2. **Install dependencies**
-   ```powershell
+   ```bash
    pip install -r requirements.txt
+   ```
+
+3. **Run SimpleSQLDB** (Choose your interface)
+   
+   **Option A: Interactive Menu (Recommended)**
+   ```bash
+   python main.py
+   ```
+   This gives you a menu to choose between:
+   - CLI/REPL Mode (command-line)
+   - Web Studio (professional dashboard)
+   - Documentation
+   - Tests
+   
+   **Option B: Web Studio Directly**
+   ```bash
+   python web_demo/app_studio.py
+   ```
+   Then open: http://127.0.0.1:5000
+   
+   **Option C: CLI Mode Directly**
+   ```bash
+   python -m repl.cli
    ```
 
 ### Running the REPL
 
 Start the interactive SQL REPL:
 
-```powershell
-python repl/cli.py
+```bash
+python main.py
+# Select option 1
 ```
 
 Example usage:
@@ -91,16 +147,51 @@ id | name     | email
 --------------------------
 1  | John Doe | john@example.com
 
-1 row(s) returned
+```1 row(s) returned
 
 sql> .exit
 ```
+
+### Using SimpleSQLDB as a Library
+
+The beauty of SimpleSQLDB's architecture is that **the RDBMS engine is independent** and can be used programmatically:
+
+```python
+from core.engine import QueryEngine
+
+# Create engine instance
+engine = QueryEngine()
+
+# Execute queries programmatically
+students = engine.execute("SELECT * FROM students")
+print(students)
+# Output: [{'id': 1, 'name': 'John', ...}, {'id': 2, 'name': 'Jane', ...}]
+
+# Use aggregates
+stats = engine.execute("""
+    SELECT dept_id, COUNT(*) as count, AVG(salary) as avg_salary
+    FROM employees 
+    GROUP BY dept_id
+""")
+
+# Get execution plans
+plan = engine.explain("SELECT * FROM employees WHERE salary > 100000")
+print(plan)  # Shows B-tree usage, access methods, etc.
+```
+
+→ **Read [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) for more examples**
 
 ### Running the Web Application
 
 Start the unified Database Management Studio:
 
-```powershell
+```bash
+python main.py
+# Select option 2: Professional Web Studio
+```
+
+Or directly:
+```bash
 cd web_demo
 python app_studio.py
 ```
