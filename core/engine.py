@@ -47,6 +47,7 @@ from core.parser import SQLParser, StatementType, JoinType
 from core.storage import Storage
 from core.schema import Table
 from core.advanced_queries import AggregateType, AggregateFunction
+from core.database_manager import DatabaseManager
 
 
 class QueryEngine:
@@ -78,15 +79,51 @@ class QueryEngine:
         parser: SQL parser instance
     """
     
-    def __init__(self, storage: Storage):
+    def __init__(
+        self,
+        storage: Optional[Storage] = None,
+        database_manager: Optional[DatabaseManager] = None,
+        default_database: Optional[str] = None,
+    ):
         """
         Initialize the query engine.
         
         Args:
-            storage: Storage engine instance to execute against
+            storage: Storage engine instance to execute against (single-database mode)
+            database_manager: Optional DatabaseManager for multi-database mode
+            default_database: Database name to select initially (multi-database mode)
         """
-        self.storage = storage
+        self.database_manager = database_manager
+        self.current_database: Optional[str] = None
+
+        # Backward-compatible: if storage is provided, start in single-db mode.
+        self.storage = storage or Storage(data_dir="data")
+
+        # Multi-db: optionally select a default database.
+        if self.database_manager is not None and default_database:
+            self.use_database(default_database)
+
         self.parser = SQLParser()
+
+    def use_database(self, name: str) -> Dict[str, Any]:
+        if self.database_manager is None:
+            return {
+                'success': False,
+                'error': 'Multi-database mode is not enabled'
+            }
+        try:
+            self.storage = self.database_manager.open_storage(name)
+            self.current_database = name
+            return {
+                'success': True,
+                'message': f"Database changed to '{name}'",
+                'rows_affected': 0,
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e)
+            }
     
     def execute(self, sql: str) -> Dict[str, Any]:
         """
@@ -121,7 +158,17 @@ class QueryEngine:
             stmt_type = parsed['type']
             
             # Dispatch to appropriate executor based on statement type
-            if stmt_type == StatementType.CREATE_TABLE:
+            if stmt_type == StatementType.CREATE_DATABASE:
+                return self._execute_create_database(parsed)
+            elif stmt_type == StatementType.DROP_DATABASE:
+                return self._execute_drop_database(parsed)
+            elif stmt_type == StatementType.USE_DATABASE:
+                return self.use_database(parsed['database'])
+            elif stmt_type == StatementType.SHOW_DATABASES:
+                return self._execute_show_databases()
+            elif stmt_type == StatementType.SHOW_TABLES:
+                return self._execute_show_tables()
+            elif stmt_type == StatementType.CREATE_TABLE:
                 return self._execute_create_table(parsed)
             elif stmt_type == StatementType.INSERT:
                 return self._execute_insert(parsed)
@@ -139,6 +186,50 @@ class QueryEngine:
         except Exception as e:
             # Return error without re-raising
             return {'success': False, 'error': str(e)}
+
+    def _execute_create_database(self, parsed: Dict[str, Any]) -> Dict[str, Any]:
+        if self.database_manager is None:
+            return {'success': False, 'error': 'Multi-database mode is not enabled'}
+        name = parsed['database']
+        self.database_manager.create_database(name)
+        return {
+            'success': True,
+            'message': f"Database '{name}' created",
+            'rows_affected': 0,
+        }
+
+    def _execute_drop_database(self, parsed: Dict[str, Any]) -> Dict[str, Any]:
+        if self.database_manager is None:
+            return {'success': False, 'error': 'Multi-database mode is not enabled'}
+        name = parsed['database']
+        if self.current_database and name == self.current_database:
+            return {'success': False, 'error': 'Cannot drop the currently selected database'}
+        self.database_manager.drop_database(name)
+        return {
+            'success': True,
+            'message': f"Database '{name}' dropped",
+            'rows_affected': 0,
+        }
+
+    def _execute_show_databases(self) -> Dict[str, Any]:
+        if self.database_manager is None:
+            return {'success': False, 'error': 'Multi-database mode is not enabled'}
+        dbs = self.database_manager.list_databases()
+        rows = [
+            {
+                'database': db.name,
+                'path': db.path,
+                'exists': db.exists,
+                'current': (db.name == self.current_database),
+            }
+            for db in dbs
+        ]
+        return {'success': True, 'rows': rows, 'count': len(rows)}
+
+    def _execute_show_tables(self) -> Dict[str, Any]:
+        tables = self.storage.list_tables()
+        rows = [{'table': name} for name in tables]
+        return {'success': True, 'rows': rows, 'count': len(rows)}
     
     def _execute_create_table(self, parsed: Dict[str, Any]) -> Dict[str, Any]:
         """Execute CREATE TABLE"""

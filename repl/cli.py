@@ -48,17 +48,41 @@ This module provides a command-line interface for interactive SQL:
         Goodbye!
 """
 import sys
+import os
 from typing import Optional
 from core.engine import QueryEngine
 from core.storage import Storage
+from core.database_manager import DatabaseManager
 
 
 class REPL:
     """Interactive SQL REPL"""
     
-    def __init__(self, data_dir: str = "data"):
-        self.storage = Storage(data_dir)
-        self.engine = QueryEngine(self.storage)
+    def __init__(self, data_dir: str = "databases"):
+        # If a directory looks like a single database (contains *.schema.json),
+        # keep legacy behavior. Otherwise treat it as a multi-db base directory.
+        use_legacy = False
+        try:
+            path = os.path.abspath(data_dir)
+            if os.path.isdir(path):
+                schema_files = [f for f in os.listdir(path) if f.endswith('.schema.json')]
+                use_legacy = len(schema_files) > 0
+        except Exception:
+            use_legacy = False
+
+        if use_legacy:
+            self.storage = Storage(data_dir)
+            self.engine = QueryEngine(self.storage)
+        else:
+            manager = DatabaseManager(base_dir=data_dir)
+            # Back-compat: expose any existing single-db folders.
+            manager.register_database('school_erp', os.path.join('databases', 'school_erp'))
+            if os.path.isdir('studio_data'):
+                manager.register_database('studio', 'studio_data')
+            # Ensure a default database exists for the REPL.
+            manager.create_database('default')
+            self.storage = manager.open_storage('default')
+            self.engine = QueryEngine(self.storage, database_manager=manager, default_database='default')
         self.running = False
     
     def start(self):
@@ -75,6 +99,8 @@ class REPL:
         print("  .explain <query> - Show query execution plan")
         print("  .sys_tables - Show system metadata for all tables")
         print("  .sys_indexes - Show all indexes")
+        print("Multi-database SQL:")
+        print("  SHOW DATABASES;  USE <db>;  CREATE DATABASE <db>;  SHOW TABLES;")
         print("  .exit or .quit - Exit the REPL")
         print("=" * 60)
         print()

@@ -13,13 +13,23 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from core.engine import QueryEngine
 from core.storage import Storage
+from core.database_manager import DatabaseManager
 
 app = Flask(__name__)
 app.secret_key = 'simplesqldb-studio-2026'
 
-# Initialize database with both schemas
-storage = Storage(data_dir='studio_data')
-engine = QueryEngine(storage)
+# Multi-database setup (MariaDB/MySQL-style)
+db_manager = DatabaseManager(base_dir='databases')
+
+# Backward-compatible registrations
+if os.path.isdir('studio_data'):
+    db_manager.register_database('studio', 'studio_data')
+db_manager.register_database('school_erp', os.path.join('databases', 'school_erp'))
+
+# Ensure the Studio database exists, then select it
+db_manager.create_database('studio')
+storage = db_manager.open_storage('studio')
+engine = QueryEngine(storage, database_manager=db_manager, default_database='studio')
 
 # Track engine status
 engine_status = {
@@ -28,6 +38,51 @@ engine_status = {
     'storage_mode': 'B-Tree Indexed',
     'initialized': False
 }
+
+
+@app.route('/api/databases', methods=['GET'])
+def list_databases():
+    """List available databases (MariaDB/MySQL-style)."""
+    infos = db_manager.list_databases()
+    return jsonify({
+        'success': True,
+        'current': engine.current_database,
+        'databases': [
+            {
+                'name': info.name,
+                'path': info.path,
+                'exists': info.exists,
+                'current': (info.name == engine.current_database)
+            }
+            for info in infos
+        ]
+    })
+
+
+@app.route('/api/databases', methods=['POST'])
+def create_database():
+    """Create a new database folder under the base databases directory."""
+    payload = request.json or {}
+    name = (payload.get('name') or '').strip()
+    if not name:
+        return jsonify({'success': False, 'error': 'Database name is required'}), 400
+    try:
+        db_manager.create_database(name)
+        return jsonify({'success': True, 'message': f"Database '{name}' created"})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
+@app.route('/api/databases/use', methods=['POST'])
+def use_database():
+    """Switch the active database for the Studio engine."""
+    payload = request.json or {}
+    name = (payload.get('name') or '').strip()
+    if not name:
+        return jsonify({'success': False, 'error': 'Database name is required'}), 400
+    result = engine.use_database(name)
+    status = 200 if result.get('success') else 400
+    return jsonify(result), status
 
 
 def _sql_text(value) -> str:
@@ -48,10 +103,10 @@ def _sql_text(value) -> str:
 
 def _next_int_id(table_name: str, id_column: str) -> int:
     """Compute the next integer id for a table using in-memory storage."""
-    if table_name not in storage.data:
+    if table_name not in engine.storage.data:
         return 1
     values = []
-    for row in storage.data.get(table_name, []):
+    for row in engine.storage.data.get(table_name, []):
         value = row.get(id_column)
         if isinstance(value, int):
             values.append(value)
@@ -65,7 +120,7 @@ def _next_int_id(table_name: str, id_column: str) -> int:
 
 def init_databases():
     """Initialize both educational and analytics datasets"""
-    tables = storage.list_tables()
+    tables = engine.storage.list_tables()
     
     if 'students' not in tables:
         print("📚 Initializing Educational Database...")
@@ -547,8 +602,8 @@ def explain_sql():
 def get_schema():
     """Get database schema information"""
     try:
-        tables_info = storage.get_system_tables_info()
-        indexes_info = storage.get_system_indexes_info()
+        tables_info = engine.storage.get_system_tables_info()
+        indexes_info = engine.storage.get_system_indexes_info()
         
         return jsonify({
             'success': True,
@@ -567,6 +622,7 @@ def get_engine_status():
         'persistence': engine_status['persistence'],
         'storage_mode': engine_status['storage_mode'],
         'initialized': engine_status['initialized'],
+        'database': engine.current_database,
         'timestamp': datetime.now().isoformat()
     })
 
@@ -575,8 +631,8 @@ def get_engine_status():
 def get_tables():
     """Get all tables with metadata"""
     try:
-        tables = storage.list_tables()
-        tables_info = storage.get_system_tables_info()
+        tables = engine.storage.list_tables()
+        tables_info = engine.storage.get_system_tables_info()
         
         result = []
         for table_info in tables_info:
@@ -588,6 +644,7 @@ def get_tables():
         
         return jsonify({
             'success': True,
+            'database': engine.current_database,
             'tables': result
         })
     except Exception as e:

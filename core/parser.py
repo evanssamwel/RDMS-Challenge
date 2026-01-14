@@ -50,6 +50,13 @@ class StatementType(Enum):
     DELETE = "DELETE"                # Data Manipulation Language
     CREATE_INDEX = "CREATE_INDEX"    # Data Definition Language
 
+    # Multi-database commands (MariaDB/MySQL-style)
+    CREATE_DATABASE = "CREATE_DATABASE"
+    DROP_DATABASE = "DROP_DATABASE"
+    USE_DATABASE = "USE_DATABASE"
+    SHOW_DATABASES = "SHOW_DATABASES"
+    SHOW_TABLES = "SHOW_TABLES"
+
 
 class JoinType(Enum):
     """
@@ -130,7 +137,17 @@ class SQLParser:
         sql_upper = sql.upper()
         
         # Dispatch to appropriate parser based on statement type
-        if sql_upper.startswith('CREATE TABLE'):
+        if sql_upper.startswith('CREATE DATABASE'):
+            return self._parse_create_database(sql)
+        elif sql_upper.startswith('DROP DATABASE'):
+            return self._parse_drop_database(sql)
+        elif sql_upper.startswith('USE '):
+            return self._parse_use_database(sql)
+        elif sql_upper == 'SHOW DATABASES':
+            return {'type': StatementType.SHOW_DATABASES}
+        elif sql_upper == 'SHOW TABLES':
+            return {'type': StatementType.SHOW_TABLES}
+        elif sql_upper.startswith('CREATE TABLE'):
             return self._parse_create_table(sql)
         elif sql_upper.startswith('INSERT INTO'):
             return self._parse_insert(sql)
@@ -145,8 +162,27 @@ class SQLParser:
         else:
             raise ValueError(
                 f"Unsupported SQL statement: {sql[:50]}. "
-                f"Supported: CREATE TABLE, INSERT, SELECT, UPDATE, DELETE, CREATE INDEX"
+                f"Supported: CREATE DATABASE, DROP DATABASE, USE, SHOW DATABASES, SHOW TABLES, "
+                f"CREATE TABLE, INSERT, SELECT, UPDATE, DELETE, CREATE INDEX"
             )
+
+    def _parse_create_database(self, sql: str) -> Dict[str, Any]:
+        match = re.match(r'CREATE DATABASE\s+(\w+)$', sql.strip(), re.IGNORECASE)
+        if not match:
+            raise ValueError("Invalid CREATE DATABASE syntax. Expected: CREATE DATABASE db_name")
+        return {'type': StatementType.CREATE_DATABASE, 'database': match.group(1)}
+
+    def _parse_drop_database(self, sql: str) -> Dict[str, Any]:
+        match = re.match(r'DROP DATABASE\s+(\w+)$', sql.strip(), re.IGNORECASE)
+        if not match:
+            raise ValueError("Invalid DROP DATABASE syntax. Expected: DROP DATABASE db_name")
+        return {'type': StatementType.DROP_DATABASE, 'database': match.group(1)}
+
+    def _parse_use_database(self, sql: str) -> Dict[str, Any]:
+        match = re.match(r'USE\s+(\w+)$', sql.strip(), re.IGNORECASE)
+        if not match:
+            raise ValueError("Invalid USE syntax. Expected: USE db_name")
+        return {'type': StatementType.USE_DATABASE, 'database': match.group(1)}
     
     def _parse_create_table(self, sql: str) -> Dict[str, Any]:
         """
