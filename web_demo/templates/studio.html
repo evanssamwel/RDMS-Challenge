@@ -1,62 +1,69 @@
 <!DOCTYPE html>
 <html lang="en" class="dark">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SimpleSQLDB Studio - Unified Database Management</title>
-    
+
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
+
     <!-- Alpine.js -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    
+
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    
+
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    
+
+    <!-- Mermaid.js -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        
+
         * {
             font-family: 'Inter', sans-serif;
         }
-        
+
         .code-editor {
             font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
             font-size: 13px;
             line-height: 1.5;
         }
-        
+
         ::-webkit-scrollbar {
             width: 8px;
             height: 8px;
         }
-        
+
         ::-webkit-scrollbar-track {
             background: #1e293b;
         }
-        
+
         ::-webkit-scrollbar-thumb {
             background: #475569;
             border-radius: 4px;
         }
-        
+
         .pulse-status {
             animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
         }
-        
+
         @keyframes pulse {
-            0%, 100% {
+
+            0%,
+            100% {
                 opacity: 1;
             }
+
             50% {
                 opacity: 0.5;
             }
         }
-        
+
         .terminal-output {
             background: #0f172a;
             border: 1px solid #10b981;
@@ -72,577 +79,319 @@
             box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
             letter-spacing: 0.5px;
         }
-        
+
         .terminal-output div {
             margin: 4px 0;
         }
-        
+
         .terminal-label {
             color: #60a5fa;
             font-weight: 600;
         }
-        
+
         .terminal-value {
             color: #10b981;
         }
-        
+
         .terminal-key {
             color: #fbbf24;
         }
-        
+
         .breadcrumb-item {
             display: inline-flex;
             align-items: center;
         }
-        
+
         .breadcrumb-item::after {
             content: '›';
             margin: 0 12px;
             color: #64748b;
         }
-        
+
         .breadcrumb-item:last-child::after {
             display: none;
         }
     </style>
 </head>
+
 <body class="bg-slate-900 text-gray-100" x-data="studioApp()">
     <div class="flex h-screen overflow-hidden">
-        
+
         <!-- SIDEBAR NAVIGATION -->
-        <aside class="w-64 bg-gradient-to-b from-slate-800 to-slate-900 border-r border-slate-700 flex flex-col">
+        <aside class="w-64 bg-slate-900 border-r border-slate-800 flex flex-col">
             <!-- Logo -->
-            <div class="p-6 border-b border-slate-700">
+            <div class="p-6 border-b border-slate-800">
                 <div class="flex items-center space-x-3 mb-2">
-                    <div class="w-10 h-10 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center">
+                    <div
+                        class="w-10 h-10 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center shadow-lg shadow-emerald-500/20">
                         <i data-lucide="database" class="w-6 h-6 text-white"></i>
                     </div>
                     <div>
-                        <h1 class="text-lg font-bold">SimpleSQLDB</h1>
-                        <p class="text-xs text-emerald-400">Studio</p>
+                        <h1 class="text-lg font-bold tracking-tight text-white">SimpleSQLDB</h1>
+                        <p class="text-xs text-emerald-500 font-medium">Workbench</p>
                     </div>
                 </div>
             </div>
-            
-            <!-- Status Indicator -->
-            <div class="px-6 py-3 bg-slate-700/30 mx-4 rounded-lg mb-6">
-                <div class="flex items-center space-x-2 mb-2">
-                    <div class="w-2 h-2 bg-emerald-500 rounded-full pulse-status"></div>
-                    <span class="text-xs font-semibold text-emerald-400">Engine: Online</span>
-                </div>
-                <div class="text-xs text-gray-400">
-                    <div>✓ Persistence: Atomic JSON</div>
-                    <div>✓ B-Tree Indexed</div>
-                </div>
-            </div>
 
-            <!-- Database Selector (Workbench-like) -->
-            <div class="px-4 mb-6">
-                <h3 class="text-xs font-semibold text-gray-400 mb-3 px-2">DATABASE</h3>
-                <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-3 space-y-3">
-                    <div>
-                        <label class="block text-[11px] text-gray-400 mb-1">Current</label>
+            <!-- Database Selector -->
+            <div class="p-4">
+                <div class="mb-4">
+                    <label class="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Active
+                        Database</label>
+                    <div class="relative">
                         <select x-model="currentDatabase" @change="useDatabase()"
-                                class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-2 text-xs text-gray-200">
+                            class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-gray-200 focus:outline-none focus:border-emerald-500 appearance-none">
                             <template x-for="db in databases" :key="db.name">
-                                <option :value="db.name" x-text="db.name"></option>
+                                <option :value="db.name" x-text="db.name" :selected="db.current"></option>
                             </template>
                         </select>
+                        <i data-lucide="chevron-down"
+                            class="w-3 h-3 text-gray-500 absolute right-3 top-2.5 pointer-events-none"></i>
                     </div>
+                </div>
 
-                    <div class="flex space-x-2">
-                        <input x-model="newDatabaseName" placeholder="new_database"
-                               class="flex-1 bg-slate-900 border border-slate-700 rounded px-2 py-2 text-xs text-gray-200" />
-                        <button @click="createDatabase()"
-                                class="px-3 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 rounded text-xs transition">
-                            Create
+                <!-- Create DB / Table Actions -->
+                <div class="grid grid-cols-2 gap-2 mb-6">
+                    <button @click="showCreateDbModal = true"
+                        class="flex items-center justify-center space-x-1 px-2 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-xs text-gray-300 transition">
+                        <i data-lucide="plus" class="w-3 h-3"></i>
+                        <span>New DB</span>
+                    </button>
+                    <button @click="openCreateTableModal()"
+                        class="flex items-center justify-center space-x-1 px-2 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded text-xs text-emerald-400 transition">
+                        <i data-lucide="table" class="w-3 h-3"></i>
+                        <span>New Table</span>
+                    </button>
+                </div>
+
+                <div class="mb-2 flex items-center justify-between">
+                    <h3 class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Tables</h3>
+                    <button @click="loadTables()" class="text-slate-500 hover:text-emerald-400 transition"
+                        title="Refresh">
+                        <i data-lucide="refresh-cw" class="w-3 h-3"></i>
+                    </button>
+                </div>
+
+                <div class="flex-1 overflow-y-auto space-y-0.5 custom-scrollbar -mx-2 px-2 max-h-[calc(100vh-300px)]">
+                    <template x-for="t in tables" :key="t.table_name">
+                        <button @click="loadTableData(t.table_name)"
+                            :class="currentTable === t.table_name ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/50' : 'text-slate-400 hover:bg-slate-800 border-transparent'"
+                            class="w-full flex items-center justify-between px-3 py-2 text-xs rounded-md border text-left group transition">
+                            <div class="flex items-center space-x-2 overflow-hidden">
+                                <i data-lucide="table-2" class="w-3 h-3 flex-shrink-0"
+                                    :class="currentTable === t.table_name ? 'text-emerald-500' : 'text-slate-600 group-hover:text-slate-500'"></i>
+                                <span class="truncate" x-text="t.table_name"></span>
+                            </div>
+                            <span class="text-[10px] text-slate-600" x-text="t.row_count"></span>
                         </button>
-                    </div>
-
-                    <div>
-                        <div class="flex items-center justify-between mb-2">
-                            <span class="text-[11px] text-gray-400">Tables</span>
-                            <button @click="loadTables()" class="text-[11px] text-gray-400 hover:text-gray-200">refresh</button>
-                        </div>
-                        <div class="space-y-1 max-h-40 overflow-auto pr-1">
-                            <template x-for="t in tables" :key="t.table_name">
-                                <div class="flex items-center justify-between text-xs text-gray-300 px-2 py-1 rounded hover:bg-slate-700/40">
-                                    <span x-text="t.table_name"></span>
-                                    <span class="text-[11px] text-gray-500" x-text="t.row_count"></span>
-                                </div>
-                            </template>
-                            <div x-show="tables.length === 0" class="text-xs text-gray-500 px-2 py-1">(no tables)</div>
-                        </div>
+                    </template>
+                    <div x-show="tables.length === 0" class="text-xs text-slate-600 px-3 py-4 text-center italic">
+                        No tables found. Create one!
                     </div>
                 </div>
             </div>
-            
-            <!-- Navigation Tabs -->
-            <nav class="space-y-2 px-4 mb-8">
-                <button @click="currentView = 'crud'; breadcrumb = 'CRUD Manager'" 
-                        :class="currentView === 'crud' ? 'bg-emerald-500/10 text-emerald-400 border-l-2 border-emerald-500' : 'text-gray-400 hover:bg-slate-700'"
-                        class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition">
-                    <i data-lucide="edit-3" class="w-5 h-5"></i>
-                    <span>CRUD Manager</span>
-                </button>
-                
-                <button @click="currentView = 'analytics'; breadcrumb = 'Analytics'" 
-                        :class="currentView === 'analytics' ? 'bg-emerald-500/10 text-emerald-400 border-l-2 border-emerald-500' : 'text-gray-400 hover:bg-slate-700'"
-                        class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition">
-                    <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
-                    <span>Analytics</span>
-                </button>
-                
-                <button @click="currentView = 'terminal'; breadcrumb = 'SQL Terminal'" 
-                        :class="currentView === 'terminal' ? 'bg-emerald-500/10 text-emerald-400 border-l-2 border-emerald-500' : 'text-gray-400 hover:bg-slate-700'"
-                        class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition">
-                    <i data-lucide="terminal" class="w-5 h-5"></i>
+
+            <div class="mt-auto p-4 border-t border-slate-800">
+                <button @click="currentView = 'terminal'"
+                    :class="currentView === 'terminal' ? 'bg-slate-800 text-emerald-400' : 'text-slate-400 hover:text-white'"
+                    class="w-full flex items-center space-x-2 px-3 py-2 rounded-lg text-xs transition">
+                    <i data-lucide="terminal" class="w-4 h-4"></i>
                     <span>SQL Terminal</span>
                 </button>
-            </nav>
-            
-            <!-- Educational Tables -->
-            <div class="px-4 mb-4">
-                <h3 class="text-xs font-semibold text-gray-400 mb-3 px-2">EDUCATIONAL</h3>
-                <div class="space-y-1">
-                    <button @click="currentView = 'crud'; crudTable = 'students'; breadcrumb = 'CRUD > Students'" 
-                            :class="crudTable === 'students' ? 'bg-blue-500/10 text-blue-400' : 'text-gray-400 hover:bg-slate-700'"
-                            class="w-full flex items-center space-x-2 px-4 py-2 text-sm rounded transition">
-                        <i data-lucide="users" class="w-4 h-4"></i>
-                        <span>Students</span>
-                    </button>
-                    <button @click="currentView = 'crud'; crudTable = 'courses'; breadcrumb = 'CRUD > Courses'" 
-                            :class="crudTable === 'courses' ? 'bg-blue-500/10 text-blue-400' : 'text-gray-400 hover:bg-slate-700'"
-                            class="w-full flex items-center space-x-2 px-4 py-2 text-sm rounded transition">
-                        <i data-lucide="book-open" class="w-4 h-4"></i>
-                        <span>Courses</span>
-                    </button>
-                    <button @click="currentView = 'crud'; crudTable = 'enrollments'; breadcrumb = 'CRUD > Enrollments'" 
-                            :class="crudTable === 'enrollments' ? 'bg-blue-500/10 text-blue-400' : 'text-gray-400 hover:bg-slate-700'"
-                            class="w-full flex items-center space-x-2 px-4 py-2 text-sm rounded transition">
-                        <i data-lucide="link" class="w-4 h-4"></i>
-                        <span>Enrollments</span>
-                    </button>
-                </div>
-            </div>
-            
-            <!-- Analytics Tables -->
-            <div class="px-4">
-                <h3 class="text-xs font-semibold text-gray-400 mb-3 px-2">ANALYTICS (HR)</h3>
-                <div class="space-y-1">
-                    <button @click="currentView = 'analytics'; analyticsTable = 'employees'; breadcrumb = 'Analytics > Employees'" 
-                            :class="analyticsTable === 'employees' ? 'bg-amber-500/10 text-amber-400' : 'text-gray-400 hover:bg-slate-700'"
-                            class="w-full flex items-center space-x-2 px-4 py-2 text-sm rounded transition">
-                        <i data-lucide="briefcase" class="w-4 h-4"></i>
-                        <span>Employees</span>
-                    </button>
-                    <button @click="currentView = 'analytics'; analyticsTable = 'departments'; breadcrumb = 'Analytics > Departments'" 
-                            :class="analyticsTable === 'departments' ? 'bg-amber-500/10 text-amber-400' : 'text-gray-400 hover:bg-slate-700'"
-                            class="w-full flex items-center space-x-2 px-4 py-2 text-sm rounded transition">
-                        <i data-lucide="building" class="w-4 h-4"></i>
-                        <span>Departments</span>
-                    </button>
+                <button @click="loadErd()"
+                    :class="currentView === 'erd' ? 'bg-slate-800 text-emerald-400' : 'text-slate-400 hover:text-white'"
+                    class="w-full flex items-center space-x-2 px-3 py-2 rounded-lg text-xs transition mt-1">
+                    <i data-lucide="share-2" class="w-4 h-4"></i>
+                    <span>Schema Visualizer</span>
+                </button>
+                <div class="mt-3 flex items-center space-x-2 text-[10px] text-slate-600">
+                    <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                    <span>System Online</span>
                 </div>
             </div>
         </aside>
-        
+
         <!-- MAIN CONTENT -->
-        <main class="flex-1 flex flex-col overflow-hidden">
-            
-            <!-- TOP BAR WITH BREADCRUMBS -->
-            <header class="bg-slate-800/50 border-b border-slate-700 px-8 py-4">
-                <div class="flex items-center justify-between mb-4">
-                    <div class="text-sm text-gray-400 breadcrumb">
-                        <span class="breadcrumb-item">SimpleSQLDB</span>
-                        <span class="breadcrumb-item" x-text="breadcrumb"></span>
+        <main class="flex-1 flex flex-col overflow-hidden bg-slate-950">
+
+            <!-- Context Header -->
+            <header
+                class="bg-slate-900/50 border-b border-slate-800 px-6 py-3 flex items-center justify-between backdrop-blur-sm">
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center text-sm text-slate-400">
+                        <i data-lucide="database" class="w-4 h-4 mr-2 text-slate-600"></i>
+                        <span x-text="currentDatabase"></span>
+                        <span class="mx-2 text-slate-600">/</span>
+                        <span x-show="currentView === 'table'" class="flex items-center text-white font-medium">
+                            <i data-lucide="table" class="w-4 h-4 mr-2 text-emerald-500"></i>
+                            <span x-text="currentTable"></span>
+                        </span>
+                        <span x-show="currentView === 'terminal'" class="text-white font-medium">SQL Terminal</span>
+                        <span x-show="currentView === 'erd'" class="text-white font-medium">Schema Visualizer</span>
                     </div>
-                    <div class="flex items-center space-x-4">
-                        <button @click="refreshData()" class="px-3 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded text-sm transition flex items-center space-x-2">
-                            <i data-lucide="refresh-cw" class="w-4 h-4"></i>
-                            <span>Refresh</span>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <button x-show="currentView === 'table'" @click="loadTableData(currentTable)"
+                        class="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition">
+                        <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                    </button>
+                    <button x-show="currentView === 'erd'" @click="loadErd()"
+                        class="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition"
+                        title="Refresh Diagram">
+                        <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </header>
+
+            <!-- CONTENT AREA -->
+            <div class="flex-1 overflow-hidden relative">
+
+                <!-- ===== TABLE DATA VIEW ===== -->
+                <div x-show="currentView === 'table'" class="h-full flex flex-col">
+                    <!-- Toolbar -->
+                    <div class="px-6 py-3 border-b border-slate-800 flex items-center justify-between bg-slate-900/20">
+                        <div class="flex items-center space-x-4">
+                            <div class="text-xs text-slate-400">
+                                <span class="font-mono text-emerald-500" x-text="tableData.count"></span> rows
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button @click="exportCsv()"
+                            class="flex items-center space-x-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs transition">
+                            <i data-lucide="download" class="w-3 h-3"></i>
+                            <span>Export</span>
+                        </button>
+                        <label
+                            class="flex items-center space-x-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs transition cursor-pointer">
+                            <i data-lucide="upload" class="w-3 h-3"></i>
+                            <span>Import</span>
+                            <input type="file" class="hidden" @change="importCsv($event)">
+                        </label>
+                        <div class="h-4 w-px bg-slate-700 mx-1"></div>
+                        <button @click="openAddRowModal()"
+                            class="flex items-center space-x-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-medium transition shadow-lg shadow-emerald-900/20">
+                            <i data-lucide="plus" class="w-3 h-3"></i>
+                            <span>Add Row</span>
                         </button>
                     </div>
-                </div>
-                <h2 class="text-2xl font-bold" x-text="getPageTitle()"></h2>
-            </header>
-            
-            <!-- CONTENT AREA -->
-            <div class="flex-1 overflow-auto">
-                
-                <!-- ===== CRUD MANAGER VIEW ===== -->
-                <div x-show="currentView === 'crud'" class="p-8">
-                    
-                    <!-- STUDENTS TABLE -->
-                    <div x-show="crudTable === 'students'" class="space-y-6">
-                        <div class="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
-                            <div class="px-6 py-4 bg-slate-700/50 border-b border-slate-700 flex justify-between items-center">
-                                <h3 class="font-semibold flex items-center space-x-2">
-                                    <i data-lucide="users" class="w-5 h-5 text-blue-500"></i>
-                                    <span>Students</span>
-                                </h3>
-                                <button @click="openAddStudent()" class="px-3 py-1 bg-blue-500 hover:bg-blue-600 rounded text-sm transition">
-                                    <i data-lucide="plus" class="w-4 h-4 inline mr-1"></i>
-                                    Add Student
-                                </button>
-                            </div>
-                            <div class="overflow-x-auto">
-                                <table class="w-full">
-                                    <thead class="bg-slate-700/30">
-                                        <tr>
-                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">ID</th>
-                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Name</th>
-                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Email</th>
-                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Phone</th>
-                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-slate-700">
-                                        <template x-for="student in students" :key="student.student_id">
-                                            <tr class="hover:bg-slate-700/20 transition">
-                                                <td class="px-6 py-4 text-sm" x-text="student.student_id"></td>
-                                                <td class="px-6 py-4 text-sm" x-text="`${student.first_name} ${student.last_name}`"></td>
-                                                <td class="px-6 py-4 text-sm text-gray-400" x-text="student.email"></td>
-                                                <td class="px-6 py-4 text-sm text-gray-400" x-text="student.phone"></td>
-                                                <td class="px-6 py-4 text-sm">
-                                                    <div class="flex items-center space-x-3">
-                                                        <button @click="openEditStudent(student)" class="text-blue-400 hover:text-blue-300 transition" title="Edit">
-                                                            <i data-lucide="pencil" class="w-4 h-4"></i>
-                                                        </button>
-                                                        <button @click="deleteStudent(student.student_id)" class="text-red-400 hover:text-red-300 transition" title="Delete">
-                                                            <i data-lucide="trash-2" class="w-4 h-4"></i>
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
+
+
+                    <!-- Data Grid -->
+                    <div class="flex-1 overflow-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="bg-slate-900 sticky top-0 z-10 shadow-sm">
+                                <tr>
+                                    <template x-for="col in tableData.columns" :key="col.name">
+                                        <th
+                                            class="px-4 py-3 text-xs font-semibold text-slate-400 border-b border-slate-800 whitespace-nowrap bg-slate-900">
+                                            <div class="flex items-center space-x-1">
+                                                <span x-text="col.name"></span>
+                                                <i x-show="col.is_pk" data-lucide="key"
+                                                    class="w-3 h-3 text-yellow-500"></i>
+                                                <i x-show="col.is_fk" data-lucide="link"
+                                                    class="w-3 h-3 text-blue-500"></i>
+                                                <span class="text-[10px] text-slate-600 font-normal uppercase ml-1"
+                                                    x-text="col.type"></span>
+                                            </div>
+                                        </th>
+                                    </template>
+                                    <th
+                                        class="px-4 py-3 text-xs font-semibold text-slate-400 border-b border-slate-800 w-20 bg-slate-900">
+                                        Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-800">
+                                <template x-for="(row, idx) in tableData.rows" :key="idx">
+                                    <tr class="hover:bg-slate-800/50 group transition-colors">
+                                        <template x-for="col in tableData.columns" :key="col.name">
+                                            <td
+                                                class="px-4 py-2 text-xs text-slate-300 whitespace-nowrap border-r border-slate-800/50 last:border-r-0">
+                                                <div class="truncate max-w-[200px]"
+                                                    x-text="row[col.name] !== null ? row[col.name] : 'NULL'"
+                                                    :class="row[col.name] === null ? 'text-slate-600 italic' : ''">
+                                                </div>
+                                            </td>
                                         </template>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        <!-- Student Modal (Add/Edit) -->
-                        <div x-show="showStudentModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center">
-                            <div class="absolute inset-0 bg-black/60" @click="closeStudentModal()"></div>
-                            <div class="relative w-full max-w-xl mx-4 bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
-                                <div class="px-6 py-4 bg-slate-700/50 border-b border-slate-700 flex items-center justify-between">
-                                    <h3 class="font-semibold" x-text="studentFormMode === 'edit' ? 'Edit Student' : 'Add Student'"></h3>
-                                    <button @click="closeStudentModal()" class="text-gray-400 hover:text-gray-200">
-                                        <i data-lucide="x" class="w-5 h-5"></i>
-                                    </button>
-                                </div>
-                                <div class="p-6 space-y-4">
-                                    <div class="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label class="block text-xs font-semibold text-gray-400 mb-2">Student ID (optional)</label>
-                                            <input x-model="studentForm.student_id" :disabled="studentFormMode === 'edit'" type="number"
-                                                   class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
-                                                   placeholder="Auto" />
-                                        </div>
-                                        <div>
-                                            <label class="block text-xs font-semibold text-gray-400 mb-2">Enrollment Date</label>
-                                            <input x-model="studentForm.enrollment_date" type="date"
-                                                   class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none" />
-                                        </div>
-                                    </div>
-
-                                    <div class="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label class="block text-xs font-semibold text-gray-400 mb-2">First Name</label>
-                                            <input x-model="studentForm.first_name" type="text"
-                                                   class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none" />
-                                        </div>
-                                        <div>
-                                            <label class="block text-xs font-semibold text-gray-400 mb-2">Last Name</label>
-                                            <input x-model="studentForm.last_name" type="text"
-                                                   class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none" />
-                                        </div>
-                                    </div>
-
-                                    <div class="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label class="block text-xs font-semibold text-gray-400 mb-2">Email</label>
-                                            <input x-model="studentForm.email" type="email"
-                                                   class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none" />
-                                        </div>
-                                        <div>
-                                            <label class="block text-xs font-semibold text-gray-400 mb-2">Phone</label>
-                                            <input x-model="studentForm.phone" type="text"
-                                                   class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none" />
-                                        </div>
-                                    </div>
-
-                                    <div class="flex items-center justify-end space-x-3 pt-2">
-                                        <button @click="closeStudentModal()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition">Cancel</button>
-                                        <button @click="saveStudent()" class="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg text-sm transition">Save</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- COURSES TABLE -->
-                    <div x-show="crudTable === 'courses'" class="space-y-6">
-                        <div class="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
-                            <div class="px-6 py-4 bg-slate-700/50 border-b border-slate-700 flex justify-between items-center">
-                                <h3 class="font-semibold flex items-center space-x-2">
-                                    <i data-lucide="book-open" class="w-5 h-5 text-blue-500"></i>
-                                    <span>Courses</span>
-                                </h3>
-                                <button @click="showAddCourseForm = true" class="px-3 py-1 bg-blue-500 hover:bg-blue-600 rounded text-sm transition">
-                                    <i data-lucide="plus" class="w-4 h-4 inline mr-1"></i>
-                                    Add Course
-                                </button>
-                            </div>
-                            <div class="overflow-x-auto">
-                                <table class="w-full">
-                                    <thead class="bg-slate-700/30">
-                                        <tr>
-                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">ID</th>
-                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Course</th>
-                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Code</th>
-                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Credits</th>
-                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Instructor</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-slate-700">
-                                        <template x-for="course in courses" :key="course.course_id">
-                                            <tr class="hover:bg-slate-700/20 transition">
-                                                <td class="px-6 py-4 text-sm" x-text="course.course_id"></td>
-                                                <td class="px-6 py-4 text-sm font-medium" x-text="course.course_name"></td>
-                                                <td class="px-6 py-4 text-sm font-mono text-emerald-400" x-text="course.course_code"></td>
-                                                <td class="px-6 py-4 text-sm" x-text="course.credits"></td>
-                                                <td class="px-6 py-4 text-sm text-gray-400" x-text="course.instructor"></td>
-                                            </tr>
-                                        </template>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- ENROLLMENTS TABLE -->
-                    <div x-show="crudTable === 'enrollments'" class="space-y-6">
-                        <div class="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
-                            <div class="px-6 py-4 bg-slate-700/50 border-b border-slate-700 flex justify-between items-center">
-                                <h3 class="font-semibold flex items-center space-x-2">
-                                    <i data-lucide="link" class="w-5 h-5 text-blue-500"></i>
-                                    <span>Enrollments (JOINed Data)</span>
-                                </h3>
-                                <button @click="openAddEnrollment()" class="px-3 py-1 bg-blue-500 hover:bg-blue-600 rounded text-sm transition">
-                                    <i data-lucide="plus" class="w-4 h-4 inline mr-1"></i>
-                                    Add Enrollment
-                                </button>
-                            </div>
-                            <div class="overflow-x-auto">
-                                <table class="w-full">
-                                    <thead class="bg-slate-700/30">
-                                        <tr>
-                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Student</th>
-                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Course</th>
-                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Code</th>
-                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Grade</th>
-                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Enrolled</th>
-                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-slate-700">
-                                        <template x-for="enrollment in enrollments" :key="enrollment.enrollment_id">
-                                            <tr class="hover:bg-slate-700/20 transition">
-                                                <td class="px-6 py-4 text-sm" x-text="`${enrollment.first_name} ${enrollment.last_name}`"></td>
-                                                <td class="px-6 py-4 text-sm font-medium" x-text="enrollment.course_name"></td>
-                                                <td class="px-6 py-4 text-sm font-mono text-emerald-400" x-text="enrollment.course_code"></td>
-                                                <td class="px-6 py-4 text-sm">
-                                                    <span :class="{'bg-green-500/20 text-green-400': enrollment.grade === 'A', 'bg-yellow-500/20 text-yellow-400': enrollment.grade === 'B'}" class="px-2 py-1 rounded text-xs" x-text="enrollment.grade"></span>
-                                                </td>
-                                                <td class="px-6 py-4 text-sm text-gray-400" x-text="enrollment.enrollment_date"></td>
-                                                <td class="px-6 py-4 text-sm">
-                                                    <div class="flex items-center space-x-3">
-                                                        <button @click="openEditEnrollment(enrollment)" class="text-blue-400 hover:text-blue-300 transition" title="Edit">
-                                                            <i data-lucide="pencil" class="w-4 h-4"></i>
-                                                        </button>
-                                                        <button @click="deleteEnrollment(enrollment.enrollment_id)" class="text-red-400 hover:text-red-300 transition" title="Delete">
-                                                            <i data-lucide="trash-2" class="w-4 h-4"></i>
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        </template>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        <!-- Enrollment Modal (Add/Edit) -->
-                        <div x-show="showEnrollmentModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center">
-                            <div class="absolute inset-0 bg-black/60" @click="closeEnrollmentModal()"></div>
-                            <div class="relative w-full max-w-xl mx-4 bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
-                                <div class="px-6 py-4 bg-slate-700/50 border-b border-slate-700 flex items-center justify-between">
-                                    <h3 class="font-semibold" x-text="enrollmentFormMode === 'edit' ? 'Edit Enrollment' : 'Add Enrollment'"></h3>
-                                    <button @click="closeEnrollmentModal()" class="text-gray-400 hover:text-gray-200">
-                                        <i data-lucide="x" class="w-5 h-5"></i>
-                                    </button>
-                                </div>
-                                <div class="p-6 space-y-4">
-                                    <div class="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label class="block text-xs font-semibold text-gray-400 mb-2">Enrollment ID (optional)</label>
-                                            <input x-model="enrollmentForm.enrollment_id" :disabled="enrollmentFormMode === 'edit'" type="number"
-                                                   class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
-                                                   placeholder="Auto" />
-                                        </div>
-                                        <div>
-                                            <label class="block text-xs font-semibold text-gray-400 mb-2">Enrollment Date</label>
-                                            <input x-model="enrollmentForm.enrollment_date" type="date"
-                                                   class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none" />
-                                        </div>
-                                    </div>
-
-                                    <div class="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label class="block text-xs font-semibold text-gray-400 mb-2">Student</label>
-                                            <select x-model="enrollmentForm.student_id"
-                                                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none">
-                                                <option value="">Select student...</option>
-                                                <template x-for="s in students" :key="s.student_id">
-                                                    <option :value="s.student_id" x-text="`${s.student_id} - ${s.first_name} ${s.last_name}`"></option>
-                                                </template>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label class="block text-xs font-semibold text-gray-400 mb-2">Course</label>
-                                            <select x-model="enrollmentForm.course_id"
-                                                    class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none">
-                                                <option value="">Select course...</option>
-                                                <template x-for="c in courses" :key="c.course_id">
-                                                    <option :value="c.course_id" x-text="`${c.course_id} - ${c.course_code} (${c.course_name})`"></option>
-                                                </template>
-                                            </select>
-                                        </div>
-                                    </div>
-
-                                    <div class="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label class="block text-xs font-semibold text-gray-400 mb-2">Grade</label>
-                                            <input x-model="enrollmentForm.grade" type="text"
-                                                   class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none"
-                                                   placeholder="A" />
-                                        </div>
-                                    </div>
-
-                                    <div class="flex items-center justify-end space-x-3 pt-2">
-                                        <button @click="closeEnrollmentModal()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition">Cancel</button>
-                                        <button @click="saveEnrollment()" class="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg text-sm transition">Save</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                </div>
-                
-                <!-- ===== ANALYTICS VIEW ===== -->
-                <div x-show="currentView === 'analytics'" class="p-8">
-                    <div class="space-y-6">
-                        
-                        <!-- Salary Analytics -->
-                        <div class="grid grid-cols-3 gap-4 mb-6">
-                            <template x-for="stat in salaryStats" :key="stat.dept_name">
-                                <div class="bg-slate-800 rounded-lg border border-slate-700 p-4">
-                                    <h4 class="text-xs font-semibold text-gray-400 mb-2" x-text="stat.dept_name"></h4>
-                                    <div class="text-2xl font-bold text-emerald-400" x-text="`${Math.round(stat.avg_salary):,.0f}`"></div>
-                                    <div class="text-xs text-gray-500 mt-1" x-text="`${stat.emp_count} employees`"></div>
-                                </div>
-                            </template>
-                        </div>
-                        
-                        <!-- Employees Table -->
-                        <div class="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
-                            <div class="px-6 py-4 bg-slate-700/50 border-b border-slate-700">
-                                <h3 class="font-semibold flex items-center space-x-2">
-                                    <i data-lucide="briefcase" class="w-5 h-5 text-amber-500"></i>
-                                    <span>Employees (with Department JOIN)</span>
-                                </h3>
-                            </div>
-                            <div class="overflow-x-auto">
-                                <table class="w-full">
-                                    <thead class="bg-slate-700/30">
-                                        <tr>
-                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Name</th>
-                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Position</th>
-                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Department</th>
-                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Location</th>
-                                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-300">Salary</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-slate-700">
-                                        <template x-for="emp in employees" :key="emp.emp_id">
-                                            <tr class="hover:bg-slate-700/20 transition">
-                                                <td class="px-6 py-4 text-sm font-medium" x-text="emp.name"></td>
-                                                <td class="px-6 py-4 text-sm text-gray-400" x-text="emp.position"></td>
-                                                <td class="px-6 py-4 text-sm" x-text="emp.dept_name"></td>
-                                                <td class="px-6 py-4 text-sm text-gray-400" x-text="emp.location"></td>
-                                                <td class="px-6 py-4 text-sm font-mono text-emerald-400" x-text="`KES ${emp.salary:,.0f}`"></td>
-                                            </tr>
-                                        </template>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                        
+                                        <td class="px-4 py-2 text-xs border-r border-slate-800/50">
+                                            <div
+                                                class="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button @click="openEditRowModal(row)"
+                                                    class="text-blue-400 hover:text-blue-300" title="Edit">
+                                                    <i data-lucide="pencil" class="w-3 h-3"></i>
+                                                </button>
+                                                <button @click="deleteRow(row)" class="text-red-400 hover:text-red-300"
+                                                    title="Delete">
+                                                    <i data-lucide="trash-2" class="w-3 h-3"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </template>
+                                <tr x-show="tableData.rows.length === 0">
+                                    <td :colspan="tableData.columns.length + 1"
+                                        class="px-6 py-12 text-center text-slate-500 text-sm">
+                                        No data found in this table.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-                
-                <!-- ===== SQL TERMINAL VIEW ===== -->
-                <div x-show="currentView === 'terminal'" class="p-8">
-                    <div class="space-y-4">
-                        
-                        <!-- SQL Editor -->
-                        <div class="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
-                            <div class="px-6 py-3 bg-slate-700/50 border-b border-slate-700">
-                                <h3 class="font-semibold text-sm">SQL Query Editor</h3>
-                            </div>
-                            <div class="p-6">
-                                <textarea x-model="sqlQuery" 
-                                          class="w-full h-32 bg-slate-900 text-gray-100 rounded-lg p-4 code-editor border border-slate-600 focus:border-emerald-500 focus:outline-none resize-none"
-                                          placeholder="SELECT * FROM students LIMIT 10;"></textarea>
-                                <div class="mt-4 flex space-x-3">
-                                    <button @click="executeSql()" class="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 rounded-lg transition flex items-center space-x-2">
-                                        <i data-lucide="play" class="w-4 h-4"></i>
-                                        <span>Execute</span>
-                                    </button>
-                                    <button @click="explainSql()" class="px-6 py-3 bg-blue-500 hover:bg-blue-600 rounded-lg transition flex items-center space-x-2">
-                                        <i data-lucide="info" class="w-4 h-4"></i>
-                                        <span>Explain Plan</span>
-                                    </button>
-                                    <button @click="sqlQuery = ''" class="px-6 py-3 bg-slate-700 hover:bg-slate-600 rounded-lg transition">Clear</button>
-                                </div>
-                            </div>
+            </div>
+
+            <!-- ===== SQL TERMINAL VIEW ===== -->
+            <div x-show="currentView === 'terminal'" class="h-full flex flex-col p-6">
+                <div class="flex-1 bg-slate-900 rounded-lg border border-slate-800 flex flex-col overflow-hidden">
+                    <div class="px-4 py-2 border-b border-slate-800 bg-slate-800/50 flex items-center justify-between">
+                        <span class="text-xs font-medium text-slate-400">Query Editor</span>
+                        <div class="flex space-x-2">
+                            <button @click="executeSql()"
+                                class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs transition flex items-center space-x-1">
+                                <i data-lucide="play" class="w-3 h-3"></i>
+                                <span>Run</span>
+                            </button>
+                            <button @click="sqlQuery = ''"
+                                class="px-3 py-1 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded text-xs transition">Clear</button>
                         </div>
-                        
-                        <!-- Results -->
-                        <div x-show="sqlResults !== null" class="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
-                            <div class="px-6 py-4 bg-slate-700/50 border-b border-slate-700">
-                                <h3 class="font-semibold text-sm">Results</h3>
-                            </div>
-                            <div x-show="!sqlResults.success" class="p-6 bg-red-500/10 border-t border-red-500/30">
-                                <div class="text-red-400 text-sm font-mono" x-text="sqlResults.error"></div>
-                            </div>
-                            <div x-show="sqlResults.success" class="p-6">
-                                <p class="text-sm text-gray-400 mb-4" x-text="`${sqlResults.count} rows returned`"></p>
-                                <div x-show="sqlResults.type === 'SELECT'" class="overflow-x-auto">
-                                    <table class="w-full text-sm">
-                                        <thead class="bg-slate-700/50">
+                    </div>
+                    <div class="h-48">
+                        <textarea x-model="sqlQuery"
+                            class="w-full h-full bg-slate-950 text-gray-200 p-4 code-editor focus:outline-none resize-none text-sm"
+                            placeholder="SELECT * FROM students LIMIT 10;"></textarea>
+                    </div>
+
+                    <!-- Results Pane -->
+                    <div class="flex-1 border-t border-slate-800 flex flex-col min-h-0">
+                        <div class="px-4 py-2 bg-slate-800/30 border-b border-slate-800">
+                            <span class="text-xs text-slate-500">Output</span>
+                        </div>
+                        <div class="flex-1 overflow-auto p-4 bg-slate-950">
+                            <div x-show="!sqlResults" class="text-slate-600 text-sm font-mono">Ready to execute
+                                query...</div>
+                            <div x-show="sqlResults && !sqlResults.success" class="text-red-400 font-mono text-sm"
+                                x-text="sqlResults?.error"></div>
+
+                            <div x-show="sqlResults && sqlResults.success">
+                                <div class="mb-2 text-xs text-emerald-500 font-mono"
+                                    x-text="sqlResults?.message || 'Query successful'"></div>
+                                <div x-show="sqlResults?.rows" class="overflow-x-auto">
+                                    <table class="w-full text-left border-collapse">
+                                        <thead class="bg-slate-900">
                                             <tr>
-                                                <template x-for="col in Object.keys(sqlResults.rows[0] || {})" :key="col">
-                                                    <th class="px-4 py-2 text-left text-xs font-semibold" x-text="col"></th>
+                                                <template x-for="col in Object.keys(sqlResults?.rows?.[0] || {})"
+                                                    :key="col">
+                                                    <th class="px-3 py-2 text-xs text-slate-400 border border-slate-800"
+                                                        x-text="col"></th>
                                                 </template>
                                             </tr>
                                         </thead>
-                                        <tbody class="divide-y divide-slate-700">
-                                            <template x-for="(row, idx) in sqlResults.rows" :key="idx">
-                                                <tr class="hover:bg-slate-700/20">
+                                        <tbody>
+                                            <template x-for="(row, idx) in sqlResults?.rows" :key="idx">
+                                                <tr>
                                                     <template x-for="col in Object.keys(row)" :key="col">
-                                                        <td class="px-4 py-2 text-xs" x-text="row[col]"></td>
+                                                        <td class="px-3 py-2 text-xs text-slate-300 border border-slate-800 font-mono"
+                                                            x-text="row[col]"></td>
                                                     </template>
                                                 </tr>
                                             </template>
@@ -651,357 +400,616 @@
                                 </div>
                             </div>
                         </div>
-                        
-                        <!-- Explain Plan Output -->
-                        <div x-show="explainOutput !== null" class="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
-                            <div class="px-6 py-4 bg-slate-700/50 border-b border-slate-700">
-                                <h3 class="font-semibold text-sm flex items-center space-x-2">
-                                    <i data-lucide="zap" class="w-4 h-4 text-yellow-500"></i>
-                                    <span>Execution Plan</span>
-                                </h3>
-                            </div>
-                            <div class="p-6">
-                                <div class="terminal-output" x-html="formatExplainOutput(explainOutput)"></div>
-                            </div>
-                        </div>
                     </div>
                 </div>
-                
             </div>
-        </main>
+
+            <!-- ===== ERD VIEW ===== -->
+            <div x-show="currentView === 'erd'" class="h-full flex flex-col p-6 bg-slate-950">
+                <div
+                    class="flex-1 bg-slate-900/50 rounded-lg border border-slate-800 flex flex-col overflow-hidden relative">
+                    <div class="absolute top-4 right-4 z-10 flex space-x-2">
+                        <div
+                            class="px-3 py-1.5 bg-slate-900/80 backdrop-blur border border-slate-700 rounded-md text-xs text-slate-400 shadow-lg">
+                            <span class="text-emerald-500 font-bold">Mermaid.js</span> Rendering
+                        </div>
+                    </div>
+                    <div
+                        class="flex-1 overflow-auto p-8 flex items-center justify-center bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-100">
+                        <div id="mermaid-container" class="w-full h-full flex items-center justify-center"></div>
+                    </div>
+                </div>
+            </div>
+
     </div>
-    
+    </main>
+    <!-- MODALS -->
+
+    <!-- Create Database Modal -->
+    <div x-show="showCreateDbModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="showCreateDbModal = false"></div>
+        <div
+            class="relative w-full max-w-sm mx-4 bg-slate-900 border border-slate-700 rounded-lg overflow-hidden shadow-2xl">
+            <div class="px-5 py-3 border-b border-slate-800 flex items-center justify-between bg-slate-800/50">
+                <h3 class="font-semibold text-sm text-gray-200">New Database</h3>
+                <button @click="showCreateDbModal=false" class="text-slate-400 hover:text-white"><i data-lucide="x"
+                        class="w-4 h-4"></i></button>
+            </div>
+            <div class="p-5 space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wide">Database
+                        Name</label>
+                    <input x-model="newDatabaseName" type="text"
+                        class="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none placeholder-slate-600"
+                        placeholder="my_database" @keydown.enter="createDatabase(); showCreateDbModal=false" />
+                </div>
+                <div class="flex items-center justify-end space-x-2 pt-2">
+                    <button @click="showCreateDbModal=false"
+                        class="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded text-xs text-slate-300 transition">Cancel</button>
+                    <button @click="createDatabase(); showCreateDbModal=false"
+                        class="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 rounded text-xs text-white transition font-medium">Create
+                        Database</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Table Modal -->
+    <div x-show="showCreateTableModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="showCreateTableModal = false"></div>
+        <div
+            class="relative w-full max-w-2xl mx-4 bg-slate-900 border border-slate-700 rounded-lg overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+            <div class="px-5 py-3 border-b border-slate-800 flex items-center justify-between bg-slate-800/50">
+                <h3 class="font-semibold text-sm text-gray-200">Design New Table</h3>
+                <button @click="showCreateTableModal=false" class="text-slate-400 hover:text-white"><i data-lucide="x"
+                        class="w-4 h-4"></i></button>
+            </div>
+            <div class="p-5 flex-1 overflow-auto space-y-5">
+                <div>
+                    <label class="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wide">Table
+                        Name</label>
+                    <input x-model="createTableForm.name" type="text"
+                        class="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none placeholder-slate-600"
+                        placeholder="e.g. users" />
+                </div>
+
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="block text-xs font-medium text-slate-400 uppercase tracking-wide">Columns</label>
+                        <button @click="addConnectTableColumn()"
+                            class="text-xs text-emerald-400 hover:text-emerald-300 flex items-center space-x-1">
+                            <i data-lucide="plus" class="w-3 h-3"></i>
+                            <span>Add Column</span>
+                        </button>
+                    </div>
+                    <div class="space-y-2">
+                        <template x-for="(col, idx) in createTableForm.columns" :key="idx">
+                            <div class="flex items-start space-x-2 bg-slate-950 p-2 rounded border border-slate-800/50">
+                                <div class="flex-1">
+                                    <input x-model="col.name" placeholder="Column Name"
+                                        class="w-full bg-transparent text-xs text-white placeholder-slate-600 border-b border-slate-800 focus:border-emerald-500 focus:outline-none px-1 py-1" />
+                                </div>
+                                <div class="w-24">
+                                    <select x-model="col.type"
+                                        class="w-full bg-slate-900 text-xs text-slate-300 border border-slate-800 rounded px-1 py-1">
+                                        <option value="INT">INT</option>
+                                        <option value="VARCHAR">VARCHAR</option>
+                                        <option value="TEXT">TEXT</option>
+                                        <option value="JSON">JSON</option>
+                                        <option value="FLOAT">FLOAT</option>
+                                        <option value="BOOLEAN">BOOLEAN</option>
+                                        <option value="DATE">DATE</option>
+                                    </select>
+                                </div>
+                                <div class="flex items-center space-x-3 px-1 pt-1.5">
+                                    <label class="flex items-center space-x-1 cursor-pointer" title="Primary Key">
+                                        <input type="checkbox" x-model="col.pk"
+                                            class="rounded bg-slate-800 border-slate-700 text-emerald-500 focus:ring-0 w-3 h-3" />
+                                        <span class="text-[10px] text-slate-500 font-mono">PK</span>
+                                    </label>
+                                    <label class="flex items-center space-x-1 cursor-pointer" title="Not Null">
+                                        <input type="checkbox" x-model="col.nn"
+                                            class="rounded bg-slate-800 border-slate-700 text-emerald-500 focus:ring-0 w-3 h-3" />
+                                        <span class="text-[10px] text-slate-500 font-mono">NN</span>
+                                    </label>
+                                    <label class="flex items-center space-x-1 cursor-pointer" title="Unique">
+                                        <input type="checkbox" x-model="col.uq"
+                                            class="rounded bg-slate-800 border-slate-700 text-emerald-500 focus:ring-0 w-3 h-3" />
+                                        <span class="text-[10px] text-slate-500 font-mono">UQ</span>
+                                    </label>
+                                </div>
+                                <button @click="removeCreateTableColumn(idx)"
+                                    class="text-slate-600 hover:text-red-400 pt-1">
+                                    <i data-lucide="trash-2" class="w-3 h-3"></i>
+                                </button>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+            <div class="px-5 py-3 border-t border-slate-800 bg-slate-800/50 flex justify-end space-x-2">
+                <button @click="showCreateTableModal=false"
+                    class="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded text-xs text-slate-300 transition">Cancel</button>
+                <button @click="saveTable()"
+                    class="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 rounded text-xs text-white transition font-medium">Create
+                    Table</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Row Editor Modal -->
+    <div x-show="showRowModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="closeRowModal()"></div>
+        <div
+            class="relative w-full max-w-lg mx-4 bg-slate-900 border border-slate-700 rounded-lg overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+            <div class="px-5 py-3 border-b border-slate-800 flex items-center justify-between bg-slate-800/50">
+                <h3 class="font-semibold text-sm text-gray-200"
+                    x-text="rowFormMode === 'edit' ? 'Edit Row' : 'Add Row'"></h3>
+                <button @click="closeRowModal()" class="text-slate-400 hover:text-white"><i data-lucide="x"
+                        class="w-4 h-4"></i></button>
+            </div>
+            <div class="p-5 flex-1 overflow-auto space-y-4">
+                <template x-for="col in tableData.columns" :key="col.name">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1.5">
+                            <span x-text="col.name"></span>
+                            <span x-show="col.is_pk" class="ml-1 text-[10px] text-yellow-500">(PK)</span>
+                            <span x-show="col.type" class="ml-1 text-[10px] text-slate-600 font-normal uppercase"
+                                x-text="col.type"></span>
+                        </label>
+
+                        <!-- Input types based on standard SQL types -->
+                        <div x-data="{ isDisabled: (rowFormMode === 'edit' && col.is_pk) }">
+
+                            <!-- Boolean -->
+                            <select x-show="col.type === 'BOOLEAN'" x-model="rowForm[col.name]" :disabled="isDisabled"
+                                class="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none placeholder-slate-600 disabled:opacity-50">
+                                <option value="true">TRUE</option>
+                                <option value="false">FALSE</option>
+                            </select>
+
+                            <!-- Date -->
+                            <input x-show="col.type === 'DATE'" type="date" x-model="rowForm[col.name]"
+                                :disabled="isDisabled"
+                                class="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none placeholder-slate-600 disabled:opacity-50" />
+
+                            <!-- Number -->
+                            <input x-show="['INT', 'FLOAT'].includes(col.type)" type="number"
+                                x-model="rowForm[col.name]" :disabled="isDisabled" step="any"
+                                class="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none placeholder-slate-600 disabled:opacity-50" />
+
+
+
+                            <!-- Long Text / JSON -->
+                            <textarea x-show="['TEXT', 'JSON'].includes(col.type)" x-model="rowForm[col.name]"
+                                :disabled="isDisabled" rows="3"
+                                class="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm text-white font-mono focus:border-emerald-500 focus:outline-none placeholder-slate-600 disabled:opacity-50"></textarea>
+
+                            <!-- Text/Default -->
+                            <input x-show="!['BOOLEAN', 'DATE', 'INT', 'FLOAT', 'TEXT', 'JSON'].includes(col.type)"
+                                type="text" x-model="rowForm[col.name]" :disabled="isDisabled"
+                                class="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none placeholder-slate-600 disabled:opacity-50" />
+
+                        </div>
+                    </div>
+                </template>
+            </div>
+            <div class="px-5 py-3 border-t border-slate-800 bg-slate-800/50 flex justify-end space-x-2">
+                <button @click="closeRowModal()"
+                    class="px-3 py-2 bg-slate-800 hover:bg-slate-700 rounded text-xs text-slate-300 transition">Cancel</button>
+                <button @click="saveRow()"
+                    class="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 rounded text-xs text-white transition font-medium">Save
+                    Row</button>
+            </div>
+        </div>
+    </div>
+
+
     <script>
         function studioApp() {
             return {
-                currentView: 'crud',
-                crudTable: 'students',
-                analyticsTable: 'employees',
-                breadcrumb: 'CRUD Manager',
+                currentView: 'table', // or 'terminal'
+                currentTable: '',
+                currentDatabase: '',
 
                 databases: [],
-                currentDatabase: '',
-                newDatabaseName: '',
                 tables: [],
-                
-                students: [],
-                courses: [],
-                enrollments: [],
-                employees: [],
-                salaryStats: [],
-                
+
+                // Generic Table Data
+                tableData: {
+                    rows: [],
+                    columns: [], // {name, type, is_pk, is_fk}
+                    count: 0
+                },
+
+                // SQL Terminal
                 sqlQuery: '',
                 sqlResults: null,
                 explainOutput: null,
-                
-                showStudentModal: false,
-                studentFormMode: 'add',
-                studentForm: {
-                    student_id: '',
-                    first_name: '',
-                    last_name: '',
-                    email: '',
-                    phone: '',
-                    enrollment_date: ''
+
+                // Modals
+                showCreateDbModal: false,
+                newDatabaseName: '',
+
+                showCreateTableModal: false,
+                createTableForm: {
+                    name: '',
+                    columns: []
                 },
 
-                showEnrollmentModal: false,
-                enrollmentFormMode: 'add',
-                enrollmentForm: {
-                    enrollment_id: '',
-                    student_id: '',
-                    course_id: '',
-                    grade: 'A',
-                    enrollment_date: ''
-                },
-                
+                showRowModal: false,
+                rowFormMode: 'add',
+                rowForm: {},
+
                 async init() {
-                    await Promise.all([
-                        this.loadDatabases(),
-                        this.loadTables(),
-                        this.loadAllData()
-                    ]);
-                    lucide.createIcons();
-                },
-
-                async loadDatabases() {
-                    const res = await fetch('/api/databases');
-                    const data = await res.json();
-                    if (!data.success) return;
-                    this.databases = data.databases || [];
-                    this.currentDatabase = data.current || (this.databases[0]?.name || '');
-                },
-
-                async createDatabase() {
-                    const name = (this.newDatabaseName || '').trim();
-                    if (!name) return;
-                    const res = await fetch('/api/databases', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({name})
-                    });
-                    const data = await res.json();
-                    if (data.success) {
-                        this.newDatabaseName = '';
-                        await this.loadDatabases();
-                    } else {
-                        alert(data.error || 'Failed to create database');
+                    await this.loadDatabases();
+                    if (this.currentDatabase) {
+                        await this.loadTables();
+                        if (this.tables.length > 0) {
+                            // Load first table by default
+                            await this.loadTableData(this.tables[0].table_name);
+                        }
                     }
+                    lucide.createIcons();
+                    mermaid.initialize({
+                        startOnLoad: false,
+                        theme: 'dark',
+                        themeVariables: {
+                            darkMode: true,
+                            background: '#0f172a',
+                            primaryColor: '#10b981',
+                            mainBkg: '#1e293b',
+                            nodeBorder: '#334155',
+                            lineColor: '#64748b',
+                            textColor: '#cbd5e1'
+                        }
+                    });
+                },
+
+                // === ERD Generator ===
+                async loadErd() {
+                    this.currentView = 'erd';
+                    const container = document.getElementById('mermaid-container');
+                    container.innerHTML = '<div class="text-slate-500 animate-pulse">Generating Schema Diagram...</div>';
+
+                    try {
+                        const res = await fetch('/api/schema/full');
+                        const data = await res.json();
+
+                        if (!data.success) throw new Error(data.error);
+
+                        let graph = 'erDiagram\n';
+                        const schema = data.schema || [];
+
+                        if (schema.length === 0) {
+                            container.innerHTML = '<div class="text-slate-500">No tables found to visualize.</div>';
+                            return;
+                        }
+
+                        // Define entities
+                        schema.forEach(table => {
+                            graph += `    ${table.table_name} {\n`;
+                            table.columns.forEach(col => {
+                                const type = col.type.toLowerCase();
+                                const key = col.is_pk ? 'PK' : (col.is_fk ? 'FK' : '');
+                                graph += `        ${type} ${col.name} ${key}\n`;
+                            });
+                            graph += `    }\n`;
+                        });
+
+                        // Define relationships
+                        schema.forEach(table => {
+                            table.columns.forEach(col => {
+                                if (col.is_fk && col.fk_target) {
+                                    // table }o--|| target : "references"
+                                    graph += `    ${table.table_name} }o--|| ${col.fk_target.table} : "${col.name}"\n`;
+                                }
+                            });
+                        });
+
+                        // Render
+                        const { svg } = await mermaid.render('graphDiv', graph);
+                        container.innerHTML = svg;
+
+                    } catch (e) {
+                        console.error(e);
+                        container.innerHTML = `<div class="text-red-400">Failed to render ERD: ${e.message}</div>`;
+                    }
+                },
+
+                // === Databases ===
+                async loadDatabases() {
+                    try {
+                        const res = await fetch('/api/databases');
+                        const data = await res.json();
+                        if (data.success) {
+                            this.databases = data.databases || [];
+                            this.currentDatabase = data.current || (this.databases[0]?.name || '');
+                        }
+                    } catch (e) { console.error(e); }
                 },
 
                 async useDatabase() {
-                    const name = (this.currentDatabase || '').trim();
-                    if (!name) return;
-                    const res = await fetch('/api/databases/use', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({name})
-                    });
-                    const data = await res.json();
-                    if (!data.success) {
-                        alert(data.error || 'Failed to switch database');
-                        await this.loadDatabases();
-                        return;
+                    if (!this.currentDatabase) return;
+                    try {
+                        const res = await fetch('/api/databases/use', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ name: this.currentDatabase })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            // Reset state
+                            this.currentTable = '';
+                            this.tableData = { rows: [], columns: [], count: 0 };
+                            this.tables = [];
+                            await this.loadTables();
+                        } else {
+                            alert(data.error);
+                        }
+                    } catch (e) {
+                        alert('Connection error');
                     }
-                    // Reload page so the demo modules (CRUD/analytics) align with the selected DB.
-                    window.location.reload();
                 },
 
+                async createDatabase() {
+                    if (!this.newDatabaseName) return;
+                    try {
+                        const res = await fetch('/api/databases', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ name: this.newDatabaseName })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            this.newDatabaseName = '';
+                            await this.loadDatabases();
+                        } else {
+                            alert(data.error);
+                        }
+                    } catch (e) { alert(e); }
+                },
+
+                // === Tables List ===
                 async loadTables() {
-                    const res = await fetch('/api/tables');
-                    const data = await res.json();
-                    if (data.success) this.tables = data.tables || [];
-                },
-                
-                async loadAllData() {
-                    await Promise.all([
-                        this.loadStudents(),
-                        this.loadCourses(),
-                        this.loadEnrollments(),
-                        this.loadEmployees(),
-                        this.loadSalaryStats()
-                    ]);
-                },
-                
-                async loadStudents() {
-                    const res = await fetch('/api/students');
-                    const data = await res.json();
-                    if (data.success) this.students = data.data;
-                },
-                
-                async loadCourses() {
-                    const res = await fetch('/api/courses');
-                    const data = await res.json();
-                    if (data.success) this.courses = data.data;
-                },
-                
-                async loadEnrollments() {
-                    const res = await fetch('/api/enrollments');
-                    const data = await res.json();
-                    if (data.success) this.enrollments = data.data;
-                },
-                
-                async loadEmployees() {
-                    const res = await fetch('/api/analytics/employees');
-                    const data = await res.json();
-                    if (data.success) this.employees = data.data;
-                },
-                
-                async loadSalaryStats() {
-                    const res = await fetch('/api/analytics/salary-by-department');
-                    const data = await res.json();
-                    if (data.success) this.salaryStats = data.data;
-                },
-                
-                async deleteStudent(studentId) {
-                    if (confirm('Are you sure?')) {
-                        const res = await fetch(`/api/students/${studentId}`, {method: 'DELETE'});
+                    try {
+                        const res = await fetch('/api/tables');
                         const data = await res.json();
-                        if (!data.success) {
-                            alert(data.error || 'Delete failed');
-                            return;
+                        if (data.success) {
+                            this.tables = data.tables || [];
+                            this.$nextTick(() => lucide.createIcons());
                         }
-                        await this.loadStudents();
-                        await this.loadEnrollments();
-                        this.$nextTick(() => lucide.createIcons());
-                    }
+                    } catch (e) { console.error(e); }
                 },
 
-                openAddStudent() {
-                    this.studentFormMode = 'add';
-                    const today = new Date().toISOString().slice(0, 10);
-                    this.studentForm = {
-                        student_id: '',
-                        first_name: '',
-                        last_name: '',
-                        email: '',
-                        phone: '',
-                        enrollment_date: today
-                    };
-                    this.showStudentModal = true;
-                    this.$nextTick(() => lucide.createIcons());
-                },
-
-                openEditStudent(student) {
-                    this.studentFormMode = 'edit';
-                    this.studentForm = {
-                        student_id: student.student_id,
-                        first_name: student.first_name,
-                        last_name: student.last_name,
-                        email: student.email,
-                        phone: student.phone,
-                        enrollment_date: student.enrollment_date || new Date().toISOString().slice(0, 10)
-                    };
-                    this.showStudentModal = true;
-                    this.$nextTick(() => lucide.createIcons());
-                },
-
-                closeStudentModal() {
-                    this.showStudentModal = false;
-                },
-
-                async saveStudent() {
-                    const payload = {...this.studentForm};
-                    if (payload.student_id === '') delete payload.student_id;
-
-                    let url = '/api/students';
-                    let method = 'POST';
-                    if (this.studentFormMode === 'edit') {
-                        url = `/api/students/${this.studentForm.student_id}`;
-                        method = 'PUT';
-                        delete payload.student_id;
-                        delete payload.enrollment_date;
-                    }
-
-                    const res = await fetch(url, {
-                        method,
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify(payload)
-                    });
-                    const data = await res.json();
-                    if (!data.success) {
-                        alert(data.error || 'Operation failed');
-                        return;
-                    }
-                    this.closeStudentModal();
-                    await this.loadStudents();
-                    await this.loadEnrollments();
-                    this.$nextTick(() => lucide.createIcons());
-                },
-
-                openAddEnrollment() {
-                    this.enrollmentFormMode = 'add';
-                    const today = new Date().toISOString().slice(0, 10);
-                    this.enrollmentForm = {
-                        enrollment_id: '',
-                        student_id: '',
-                        course_id: '',
-                        grade: 'A',
-                        enrollment_date: today
-                    };
-                    this.showEnrollmentModal = true;
-                    this.$nextTick(() => lucide.createIcons());
-                },
-
-                openEditEnrollment(enrollment) {
-                    this.enrollmentFormMode = 'edit';
-                    this.enrollmentForm = {
-                        enrollment_id: enrollment.enrollment_id,
-                        student_id: enrollment.student_id,
-                        course_id: enrollment.course_id,
-                        grade: enrollment.grade || 'A',
-                        enrollment_date: enrollment.enrollment_date || new Date().toISOString().slice(0, 10)
-                    };
-                    this.showEnrollmentModal = true;
-                    this.$nextTick(() => lucide.createIcons());
-                },
-
-                closeEnrollmentModal() {
-                    this.showEnrollmentModal = false;
-                },
-
-                async saveEnrollment() {
-                    const payload = {...this.enrollmentForm};
-                    if (payload.enrollment_id === '') delete payload.enrollment_id;
-                    if (payload.student_id === '' || payload.course_id === '') {
-                        alert('Student and Course are required');
-                        return;
-                    }
-
-                    let url = '/api/enrollments';
-                    let method = 'POST';
-                    if (this.enrollmentFormMode === 'edit') {
-                        url = `/api/enrollments/${this.enrollmentForm.enrollment_id}`;
-                        method = 'PUT';
-                        delete payload.enrollment_id;
-                    }
-
-                    const res = await fetch(url, {
-                        method,
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify(payload)
-                    });
-                    const data = await res.json();
-                    if (!data.success) {
-                        alert(data.error || 'Operation failed');
-                        return;
-                    }
-                    this.closeEnrollmentModal();
-                    await this.loadEnrollments();
-                    this.$nextTick(() => lucide.createIcons());
-                },
-
-                async deleteEnrollment(enrollmentId) {
-                    if (confirm('Delete this enrollment?')) {
-                        const res = await fetch(`/api/enrollments/${enrollmentId}`, {method: 'DELETE'});
+                // === Generic Table Data ===
+                async loadTableData(tableName) {
+                    this.currentTable = tableName;
+                    this.currentView = 'table';
+                    try {
+                        const res = await fetch(`/api/table/${tableName}`);
                         const data = await res.json();
-                        if (!data.success) {
-                            alert(data.error || 'Delete failed');
-                            return;
+                        if (data.success) {
+                            this.tableData = {
+                                rows: data.rows,
+                                columns: data.columns,
+                                count: data.count
+                            };
+                            this.$nextTick(() => lucide.createIcons());
+                        } else {
+                            alert(data.error);
                         }
-                        await this.loadEnrollments();
-                        this.$nextTick(() => lucide.createIcons());
+                    } catch (e) { console.error(e); }
+                },
+
+                async refreshData() {
+                    if (this.currentView === 'table' && this.currentTable) {
+                        await this.loadTableData(this.currentTable);
                     }
                 },
-                
+
+                // === Create Table ===
+                openCreateTableModal() {
+                    this.createTableForm = {
+                        name: '',
+                        columns: [
+                            { name: 'id', type: 'INT', pk: true, nn: true, uq: false }
+                        ]
+                    };
+                    this.showCreateTableModal = true;
+                },
+
+                addConnectTableColumn() {
+                    this.createTableForm.columns.push({ name: '', type: 'VARCHAR', pk: false, nn: false, uq: false });
+                },
+
+                removeCreateTableColumn(idx) {
+                    this.createTableForm.columns.splice(idx, 1);
+                },
+
+                async saveTable() {
+                    if (!this.createTableForm.name) return alert('Table name required');
+                    try {
+                        const res = await fetch('/api/tables/create', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(this.createTableForm)
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            this.showCreateTableModal = false;
+                            await this.loadTables();
+                            await this.loadTableData(this.createTableForm.name);
+                        } else {
+                            alert(data.error);
+                        }
+                    } catch (e) { alert(e); }
+                },
+
+                // === Row Operations ===
+                openAddRowModal() {
+                    if (!this.currentTable) return;
+                    this.rowFormMode = 'add';
+                    this.rowForm = {};
+
+                    // Pre-fill defaults or empty strings
+                    this.tableData.columns.forEach(col => {
+                        this.rowForm[col.name] = '';
+                    });
+
+                    this.showRowModal = true;
+                },
+
+                openEditRowModal(row) {
+                    this.rowFormMode = 'edit';
+                    // Clone row to form
+                    this.rowForm = { ...row };
+                    this.showRowModal = true;
+                },
+
+                closeRowModal() {
+                    this.showRowModal = false;
+                },
+
+                async saveRow() {
+                    let url = `/api/table/${this.currentTable}`;
+                    let method = 'POST';
+
+                    if (this.rowFormMode === 'edit') {
+                        // Find PK
+                        const pkCol = this.tableData.columns.find(c => c.is_pk);
+                        if (!pkCol) return alert('Cannot edit table without Primary Key');
+                        const pkVal = this.rowForm[pkCol.name];
+                        url += `/${pkVal}`;
+                        method = 'PUT';
+                    }
+
+                    try {
+                        const res = await fetch(url, {
+                            method,
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(this.rowForm)
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            this.closeRowModal();
+                            await this.loadTableData(this.currentTable);
+                        } else {
+                            alert(data.error);
+                        }
+                    } catch (e) { alert(e); }
+                },
+
+                async deleteRow(row) {
+                    if (!confirm('Are you sure you want to delete this row?')) return;
+
+                    const pkCol = this.tableData.columns.find(c => c.is_pk);
+                    if (!pkCol) return alert('Cannot delete from table without Primary Key');
+
+                    const pkVal = row[pkCol.name];
+                    try {
+                        const res = await fetch(`/api/table/${this.currentTable}/${pkVal}`, {
+                            method: 'DELETE'
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            await this.loadTableData(this.currentTable);
+                        } else {
+                            alert(data.error);
+                        }
+                    } catch (e) { alert(e); }
+                },
+
+                // === Import / Export ===
+                async exportCsv() {
+                    try {
+                        const res = await fetch(`/api/table/${this.currentTable}/export`);
+                        const data = await res.json();
+                        if (data.success) {
+                            // Trigger download
+                            const blob = new Blob([data.csv], { type: 'text/csv' });
+                            const url = window.URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = data.filename;
+                            document.body.appendChild(a);
+                            a.click();
+                            window.URL.revokeObjectURL(url);
+                            a.remove();
+                        } else {
+                            alert(data.error);
+                        }
+                    } catch (e) { alert(e); }
+                },
+
+                async importCsv(event) {
+                    const file = event.target.files[0];
+                    if (!file) return;
+
+                    const reader = new FileReader();
+                    reader.onload = async (e) => {
+                        const csvContent = e.target.result;
+                        try {
+                            const res = await fetch(`/api/table/${this.currentTable}/import`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ csv: csvContent })
+                            });
+                            const data = await res.json();
+                            if (data.success) {
+                                alert(data.message);
+                                if (data.errors && data.errors.length > 0) {
+                                    alert('Some rows failed: \n' + data.errors.join('\n'));
+                                }
+                                await this.loadTableData(this.currentTable);
+                            } else {
+                                alert(data.error);
+                            }
+                        } catch (err) { alert(err); }
+                        // Reset input
+                        event.target.value = '';
+                    };
+                    reader.readAsText(file);
+                },
+
+
+                // === SQL Terminal ===
                 async executeSql() {
-                    const res = await fetch('/api/execute', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({sql: this.sqlQuery})
-                    });
-                    this.sqlResults = await res.json();
+                    try {
+                        const res = await fetch('/api/execute', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ sql: this.sqlQuery })
+                        });
+                        this.sqlResults = await res.json();
+                    } catch (e) { alert(e); }
                 },
-                
+
                 async explainSql() {
-                    const res = await fetch('/api/explain', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({sql: this.sqlQuery})
-                    });
-                    const data = await res.json();
-                    this.explainOutput = data.plan;
+                    try {
+                        const res = await fetch('/api/explain', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ sql: this.sqlQuery })
+                        });
+                        const data = await res.json();
+                        this.explainOutput = data.plan;
+                    } catch (e) { alert(e); }
                 },
-                
+
                 formatExplainOutput(plan) {
                     if (!plan) return '';
-                    const esc = (s) => String(s)
-                        .replaceAll('&', '&amp;')
-                        .replaceAll('<', '&lt;')
-                        .replaceAll('>', '&gt;');
-
-                    const formatDetails = (details) => {
-                        if (!details) return '';
-                        if (typeof details === 'string') return esc(details);
-                        try { return esc(JSON.stringify(details)); } catch { return esc(String(details)); }
-                    };
+                    const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
                     const walk = (node, prefix = '', isLast = true) => {
                         const connector = isLast ? '└─ ' : '├─ ';
                         const type = esc(node?.type || 'UNKNOWN');
-                        const details = formatDetails(node?.details);
                         let line = `<div><span class="terminal-key">${esc(prefix + connector + type)}</span>`;
-                        if (details) line += ` <span class="terminal-value">${details}</span>`;
+
+                        if (node?.details) {
+                            const d = typeof node.details === 'string' ? node.details : JSON.stringify(node.details);
+                            line += ` <span class="terminal-value">${esc(d)}</span>`;
+                        }
                         line += `</div>`;
 
                         const children = node?.children || [];
@@ -1011,33 +1019,15 @@
                         }
                         return line;
                     };
+                    return walk(plan, '', true);
+                },
 
-                    let output = '<div class="terminal-label">═══════════════════════════════════════════</div>';
-                    output += '<div class="terminal-label">  QUERY EXECUTION PLAN (TREE)</div>';
-                    output += '<div class="terminal-label">═══════════════════════════════════════════</div>';
-                    output += walk(plan, '', true);
-                    output += '<div class="terminal-label">═══════════════════════════════════════════</div>';
-                    return output;
-                },
-                
                 getPageTitle() {
-                    const titles = {
-                        'crud-students': '👥 Students Management',
-                        'crud-courses': '📚 Courses Management',
-                        'crud-enrollments': '🔗 Student Enrollments',
-                        'analytics': '📊 HR Analytics Dashboard',
-                        'terminal': '💻 SQL Terminal'
-                    };
-                    const key = this.currentView === 'crud' ? `crud-${this.crudTable}` : this.currentView;
-                    return titles[key] || 'SimpleSQLDB Studio';
-                },
-                
-                async refreshData() {
-                    await this.loadAllData();
-                    this.$nextTick(() => lucide.createIcons());
+                    return 'SimpleSQLDB Studio';
                 }
             }
         }
     </script>
 </body>
+
 </html>

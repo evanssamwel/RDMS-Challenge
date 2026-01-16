@@ -670,10 +670,14 @@ class Storage:
             table_name = schema_file.stem.replace('.schema', '')
             
             # Load schema
-            with open(schema_file, 'r') as f:
-                schema_data = json.load(f)
-                table = Table.from_dict(schema_data)
-                self.tables[table_name] = table
+            try:
+                with open(schema_file, 'r') as f:
+                    schema_data = json.load(f)
+                    table = Table.from_dict(schema_data)
+                    self.tables[table_name] = table
+            except (json.JSONDecodeError, KeyError, ValueError) as e:
+                print(f"WARNING: Skipping corrupt table '{table_name}': {e}")
+                continue
             
             # Load data
             data_file = self.data_dir / f"{table_name}.data.json"

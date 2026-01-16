@@ -1,64 +1,74 @@
 <!DOCTYPE html>
 <html lang="en" class="dark">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SimpleSQLDB - Professional Database Management</title>
-    
+
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
+
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-        
+
         * {
             font-family: 'Inter', sans-serif;
         }
-        
+
         .hero-gradient {
             background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f1729 100%);
         }
-        
+
         .card-glow-emerald {
             box-shadow: 0 0 30px rgba(16, 185, 129, 0.2);
             transition: all 0.3s ease;
         }
-        
+
         .card-glow-emerald:hover {
             box-shadow: 0 0 40px rgba(16, 185, 129, 0.4);
             transform: translateY(-5px);
         }
-        
+
         .card-glow-blue {
             box-shadow: 0 0 30px rgba(30, 58, 138, 0.2);
             transition: all 0.3s ease;
         }
-        
+
         .card-glow-blue:hover {
             box-shadow: 0 0 40px rgba(30, 58, 138, 0.4);
             transform: translateY(-5px);
         }
-        
+
         .float-animation {
             animation: float 6s ease-in-out infinite;
         }
-        
+
         @keyframes float {
-            0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-20px); }
+
+            0%,
+            100% {
+                transform: translateY(0px);
+            }
+
+            50% {
+                transform: translateY(-20px);
+            }
         }
     </style>
 </head>
+
 <body class="bg-slate-950 text-gray-100">
     <!-- Navigation -->
     <nav class="bg-slate-900/80 border-b border-slate-800 backdrop-blur-sm sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-6 py-4">
             <div class="flex items-center justify-between">
                 <div class="flex items-center space-x-3">
-                    <div class="w-10 h-10 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center">
+                    <div
+                        class="w-10 h-10 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center">
                         <i data-lucide="database" class="w-6 h-6 text-white"></i>
                     </div>
                     <div>
@@ -66,19 +76,21 @@
                         <p class="text-xs text-emerald-400">Management Studio</p>
                     </div>
                 </div>
-                <a href="https://github.com/evanssamwel/RDMS-Challenge" target="_blank" class="flex items-center space-x-2 text-gray-400 hover:text-white transition">
+                <a href="https://github.com/evanssamwel/RDMS-Challenge" target="_blank"
+                    class="flex items-center space-x-2 text-gray-400 hover:text-white transition">
                     <i data-lucide="github" class="w-5 h-5"></i>
                     <span class="text-sm">GitHub</span>
                 </a>
             </div>
         </div>
     </nav>
-    
+
     <!-- Hero Section -->
     <section class="hero-gradient py-20 px-6">
         <div class="max-w-4xl mx-auto text-center">
             <div class="mb-6">
-                <h2 class="text-5xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">
+                <h2
+                    class="text-5xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">
                     SimpleSQLDB
                 </h2>
                 <p class="text-xl text-gray-400 mb-2">
@@ -88,7 +100,7 @@
                     Built from scratch with B-Tree indexing, SQL parser, and enterprise architecture
                 </p>
             </div>
-            
+
             <!-- Stats -->
             <div class="grid grid-cols-3 gap-4 mt-12 mb-8">
                 <div class="bg-slate-800/50 rounded-lg border border-slate-700 p-4">
@@ -106,7 +118,7 @@
             </div>
         </div>
     </section>
-    
+
     <!-- Main Content -->
     <section class="py-20 px-6">
         <div class="max-w-6xl mx-auto">
@@ -114,78 +126,89 @@
             <div class="text-center mb-16">
                 <h3 class="text-3xl font-bold mb-4">Choose Your Experience</h3>
                 <p class="text-gray-400 max-w-2xl mx-auto">
-                    SimpleSQLDB offers two distinct interfaces powered by the same powerful RDBMS engine. 
+                    SimpleSQLDB offers two distinct interfaces powered by the same powerful RDBMS engine.
                     Whether you're managing data or exploring the database internals, we've got you covered.
                 </p>
             </div>
-            
+
             <!-- Gateway Cards -->
             <div class="grid md:grid-cols-2 gap-8 mb-16">
-                
+
                 <!-- School ERP Card -->
-                <div class="card-glow-emerald bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden hover:border-emerald-500/50 transition">
+                <div
+                    class="card-glow-emerald bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden hover:border-emerald-500/50 transition">
                     <div class="p-8">
                         <!-- Icon -->
-                        <div class="w-16 h-16 bg-emerald-500/20 rounded-xl flex items-center justify-center mb-6 float-animation">
+                        <div
+                            class="w-16 h-16 bg-emerald-500/20 rounded-xl flex items-center justify-center mb-6 float-animation">
                             <i data-lucide="graduation-cap" class="w-8 h-8 text-emerald-400"></i>
                         </div>
-                        
+
                         <!-- Title -->
                         <h3 class="text-2xl font-bold mb-2 text-white">School Management ERP</h3>
                         <p class="text-emerald-400 text-sm font-semibold mb-4">Feature-Rich Application</p>
-                        
+
                         <!-- Description -->
                         <p class="text-gray-400 mb-6 text-sm leading-relaxed">
-                            A complete school management system with multi-user roles, demonstrating complex RDBMS operations 
+                            A complete school management system with multi-user roles, demonstrating complex RDBMS
+                            operations
                             including foreign keys, JOINs, aggregates, and real-world business logic.
                         </p>
-                        
+
                         <!-- Features -->
                         <div class="space-y-2 mb-8">
                             <div class="flex items-start space-x-2">
-                                <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0"></i>
+                                <i data-lucide="check-circle-2"
+                                    class="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0"></i>
                                 <span class="text-sm text-gray-300">Multi-User Roles (Admin, Teacher, Student)</span>
                             </div>
                             <div class="flex items-start space-x-2">
-                                <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0"></i>
+                                <i data-lucide="check-circle-2"
+                                    class="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0"></i>
                                 <span class="text-sm text-gray-300">10 Interconnected Tables with Foreign Keys</span>
                             </div>
                             <div class="flex items-start space-x-2">
-                                <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0"></i>
+                                <i data-lucide="check-circle-2"
+                                    class="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0"></i>
                                 <span class="text-sm text-gray-300">Advanced Analytics & GROUP BY Queries</span>
                             </div>
                             <div class="flex items-start space-x-2">
-                                <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0"></i>
+                                <i data-lucide="check-circle-2"
+                                    class="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0"></i>
                                 <span class="text-sm text-gray-300">Bulk Import & Real-time System Logs</span>
                             </div>
                         </div>
-                        
+
                         <!-- Button -->
-                        <a href="/school" class="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold py-3 rounded-lg transition flex items-center justify-center space-x-2">
+                        <a href="http://127.0.0.1:5001/" target="_blank"
+                            class="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold py-3 rounded-lg transition flex items-center justify-center space-x-2">
                             <i data-lucide="play" class="w-5 h-5"></i>
                             <span>Launch School ERP</span>
                         </a>
                     </div>
                 </div>
-                
+
                 <!-- Database Lab Card -->
-                <div class="card-glow-blue bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden hover:border-blue-500/50 transition">
+                <div
+                    class="card-glow-blue bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden hover:border-blue-500/50 transition">
                     <div class="p-8">
                         <!-- Icon -->
-                        <div class="w-16 h-16 bg-blue-500/20 rounded-xl flex items-center justify-center mb-6 float-animation" style="animation-delay: 0.3s;">
+                        <div class="w-16 h-16 bg-blue-500/20 rounded-xl flex items-center justify-center mb-6 float-animation"
+                            style="animation-delay: 0.3s;">
                             <i data-lucide="terminal" class="w-8 h-8 text-blue-400"></i>
                         </div>
-                        
+
                         <!-- Title -->
                         <h3 class="text-2xl font-bold mb-2 text-white">RDBMS Explorer</h3>
                         <p class="text-blue-400 text-sm font-semibold mb-4">For Technical Users</p>
-                        
+
                         <!-- Description -->
                         <p class="text-gray-400 mb-6 text-sm leading-relaxed">
-                            A powerful terminal interface for advanced SQL exploration. Write complex queries, examine execution plans, 
+                            A powerful terminal interface for advanced SQL exploration. Write complex queries, examine
+                            execution plans,
                             inspect B-Tree indexing strategies, and view system metadata in real-time.
                         </p>
-                        
+
                         <!-- Features -->
                         <div class="space-y-2 mb-8">
                             <div class="flex items-start space-x-2">
@@ -205,17 +228,18 @@
                                 <span class="text-sm text-gray-300">System Tables (.sys_tables, .sys_indexes)</span>
                             </div>
                         </div>
-                        
+
                         <!-- Button -->
-                        <a href="/studio?view=terminal" class="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-3 rounded-lg transition flex items-center justify-center space-x-2">
+                        <a href="/studio?view=terminal"
+                            class="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-3 rounded-lg transition flex items-center justify-center space-x-2">
                             <i data-lucide="terminal" class="w-5 h-5"></i>
                             <span>Open RDBMS Explorer</span>
                         </a>
                     </div>
                 </div>
-                
+
             </div>
-            
+
             <!-- Architecture Info -->
             <div class="bg-gradient-to-r from-slate-800/50 to-slate-700/50 border border-slate-700 rounded-xl p-8">
                 <div class="flex items-start space-x-4">
@@ -225,22 +249,34 @@
                     <div>
                         <h4 class="text-lg font-bold mb-2">Professional N-Tier Architecture</h4>
                         <p class="text-gray-400 text-sm mb-4">
-                            SimpleSQLDB demonstrates enterprise-grade software architecture with complete separation of concerns. 
-                            The RDBMS engine at the core is completely independent and can power multiple interfaces without modification.
+                            SimpleSQLDB demonstrates enterprise-grade software architecture with complete separation of
+                            concerns.
+                            The RDBMS engine at the core is completely independent and can power multiple interfaces
+                            without modification.
                         </p>
                         <div class="flex flex-wrap gap-2">
-                            <span class="px-3 py-1 bg-slate-700/50 border border-slate-600 rounded-full text-xs text-gray-300">B-Tree Indexing</span>
-                            <span class="px-3 py-1 bg-slate-700/50 border border-slate-600 rounded-full text-xs text-gray-300">SQL Parser</span>
-                            <span class="px-3 py-1 bg-slate-700/50 border border-slate-600 rounded-full text-xs text-gray-300">Atomic Writes</span>
-                            <span class="px-3 py-1 bg-slate-700/50 border border-slate-600 rounded-full text-xs text-gray-300">Foreign Keys</span>
-                            <span class="px-3 py-1 bg-slate-700/50 border border-slate-600 rounded-full text-xs text-gray-300">Query Optimization</span>
+                            <span
+                                class="px-3 py-1 bg-slate-700/50 border border-slate-600 rounded-full text-xs text-gray-300">B-Tree
+                                Indexing</span>
+                            <span
+                                class="px-3 py-1 bg-slate-700/50 border border-slate-600 rounded-full text-xs text-gray-300">SQL
+                                Parser</span>
+                            <span
+                                class="px-3 py-1 bg-slate-700/50 border border-slate-600 rounded-full text-xs text-gray-300">Atomic
+                                Writes</span>
+                            <span
+                                class="px-3 py-1 bg-slate-700/50 border border-slate-600 rounded-full text-xs text-gray-300">Foreign
+                                Keys</span>
+                            <span
+                                class="px-3 py-1 bg-slate-700/50 border border-slate-600 rounded-full text-xs text-gray-300">Query
+                                Optimization</span>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
     </section>
-    
+
     <!-- Footer -->
     <footer class="border-t border-slate-800 py-8 px-6">
         <div class="max-w-6xl mx-auto">
@@ -249,31 +285,35 @@
                 <div>
                     <h4 class="font-semibold mb-3 text-white">About</h4>
                     <p class="text-sm text-gray-400">
-                        SimpleSQLDB is a professional RDBMS built from scratch for the Pesapal Junior Dev Challenge 2026.
+                        SimpleSQLDB is a professional RDBMS built from scratch for the Pesapal Junior Dev Challenge
+                        2026.
                     </p>
                 </div>
-                
+
                 <!-- Documentation -->
                 <div>
                     <h4 class="font-semibold mb-3 text-white">Documentation</h4>
                     <ul class="space-y-2 text-sm">
                         <li><a href="#" class="text-gray-400 hover:text-emerald-400 transition">README.md</a></li>
                         <li><a href="#" class="text-gray-400 hover:text-emerald-400 transition">ARCHITECTURE.md</a></li>
-                        <li><a href="#" class="text-gray-400 hover:text-emerald-400 transition">DEVELOPER_GUIDE.md</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-emerald-400 transition">DEVELOPER_GUIDE.md</a>
+                        </li>
                     </ul>
                 </div>
-                
+
                 <!-- Links -->
                 <div>
                     <h4 class="font-semibold mb-3 text-white">Links</h4>
                     <ul class="space-y-2 text-sm">
-                        <li><a href="https://github.com/evanssamwel/RDMS-Challenge" target="_blank" class="text-gray-400 hover:text-emerald-400 transition">GitHub Repository</a></li>
-                        <li><a href="#" class="text-gray-400 hover:text-emerald-400 transition">Pesapal Challenge</a></li>
+                        <li><a href="https://github.com/evanssamwel/RDMS-Challenge" target="_blank"
+                                class="text-gray-400 hover:text-emerald-400 transition">GitHub Repository</a></li>
+                        <li><a href="#" class="text-gray-400 hover:text-emerald-400 transition">Pesapal Challenge</a>
+                        </li>
                         <li><a href="#" class="text-gray-400 hover:text-emerald-400 transition">Contact</a></li>
                     </ul>
                 </div>
             </div>
-            
+
             <div class="border-t border-slate-800 pt-8 flex items-center justify-between">
                 <p class="text-sm text-gray-500">
                     © 2026 SimpleSQLDB. Pesapal Junior Dev Challenge.
@@ -288,9 +328,10 @@
             </div>
         </div>
     </footer>
-    
+
     <script>
         lucide.createIcons();
     </script>
 </body>
+
 </html>

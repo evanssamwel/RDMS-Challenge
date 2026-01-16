@@ -8,6 +8,8 @@ from flask import Flask, render_template, request, jsonify
 import sys
 import os
 from datetime import datetime
+import csv
+import io
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -614,6 +616,44 @@ def get_schema():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@app.route('/api/schema/full', methods=['GET'])
+def get_full_schema():
+    """Get complete schema with foreign keys for ERD generation"""
+    try:
+        tables = engine.storage.list_tables()
+        schema = []
+        
+        for table_name in tables:
+            table_def = engine.storage.get_table(table_name)
+            columns = []
+            for col in table_def.columns:
+                col_data = {
+                    'name': col.name,
+                    'type': col.data_type.value,
+                    'is_pk': col.primary_key,
+                    'is_fk': bool(col.foreign_key)
+                }
+                if col.foreign_key:
+                    col_data['fk_target'] = {
+                        'table': col.foreign_key[0],
+                        'column': col.foreign_key[1]
+                    }
+                columns.append(col_data)
+            
+            schema.append({
+                'table_name': table_name,
+                'columns': columns
+            })
+            
+        return jsonify({
+            'success': True,
+            'database': engine.current_database,
+            'schema': schema
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/api/engine-status', methods=['GET'])
 def get_engine_status():
     """Get engine status and configuration"""
@@ -646,6 +686,327 @@ def get_tables():
             'success': True,
             'database': engine.current_database,
             'tables': result
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+
+# ============ GENERIC TABLE OPERATIONS ============
+
+@app.route('/api/table/<table_name>', methods=['GET'])
+def get_table_rows(table_name):
+    """Fetch all rows for a specific table."""
+    try:
+        # Check if table exists
+        if table_name not in engine.storage.list_tables():
+             return jsonify({'success': False, 'error': f"Table '{table_name}' does not exist"}), 404
+
+        result = engine.execute(f"SELECT * FROM {table_name}")
+        if not result.get('success'):
+            return jsonify({'success': False, 'error': result.get('error', 'Query failed')}), 400
+            
+        # Get column info for the table to identify types/PKs
+        table_def = engine.storage.get_table(table_name)
+        columns = [
+            {
+                'name': col.name,
+                'type': col.data_type.value,
+                'is_pk': col.primary_key,
+                'is_fk': bool(col.foreign_key)
+            }
+            for col in table_def.columns
+        ]
+        
+        return jsonify({
+            'success': True, 
+            'rows': result.get('rows', []), 
+            'count': result.get('count', 0),
+            'columns': columns
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/table/<table_name>', methods=['POST'])
+def insert_table_row(table_name):
+    """Insert a row into a table."""
+    try:
+        data = request.json or {}
+        
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'}), 400
+            
+        table_def = engine.storage.get_table(table_name)
+        if not table_def:
+            return jsonify({'success': False, 'error': f"Table '{table_name}' does not exist"}), 404
+
+        # filter data to only include valid columns
+        valid_columns = [col.name for col in table_def.columns]
+        insert_data = {k: v for k, v in data.items() if k in valid_columns}
+        
+        if not insert_data:
+             return jsonify({'success': False, 'error': 'No valid column data provided'}), 400
+
+        cols = list(insert_data.keys())
+        vals = []
+        
+        # Simple formatting for values
+        for col_name in cols:
+            val = insert_data[col_name]
+            # quote strings and dates, but not if they are None/numbers (simplified)
+            if isinstance(val, str):
+                safe_val = _sql_text(val)
+                vals.append(f"'{safe_val}'")
+            elif val is None:
+                vals.append("NULL")
+            else:
+                 vals.append(str(val))
+
+        col_str = ", ".join(cols)
+        val_str = ", ".join(vals)
+        
+        query = f"INSERT INTO {table_name} ({col_str}) VALUES ({val_str})"
+        result = engine.execute(query)
+        
+        if not result.get('success'):
+            return jsonify({'success': False, 'error': result.get('error', 'Insert failed')}), 400
+            
+        return jsonify({'success': True, 'message': 'Row inserted'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/table/<table_name>/<path:pk_value>', methods=['PUT'])
+def update_table_row(table_name, pk_value):
+    """Update a row in a table."""
+    try:
+        data = request.json or {}
+        
+        table_def = engine.storage.get_table(table_name)
+        if not table_def:
+             return jsonify({'success': False, 'error': f"Table '{table_name}' does not exist"}), 404
+             
+        # Find PK column
+        pk_col = next((col for col in table_def.columns if col.primary_key), None)
+        if not pk_col:
+            return jsonify({'success': False, 'error': 'Table has no Primary Key, cannot update by ID'}), 400
+            
+        # Construct SET clause
+        updates = []
+        for key, val in data.items():
+            if key == pk_col.name: continue # Don't update PK
+            
+            if isinstance(val, str):
+                safe_val = _sql_text(val)
+                updates.append(f"{key} = '{safe_val}'")
+            elif val is None:
+                updates.append(f"{key} = NULL")
+            else:
+                updates.append(f"{key} = {val}")
+        
+        if not updates:
+            return jsonify({'success': False, 'error': 'No fields to update'}), 400
+            
+        set_clause = ", ".join(updates)
+        
+        # Handle PK value type
+        safe_pk = pk_value
+        if pk_col.data_type.value in ('INT', 'FLOAT') and str(pk_value).replace('.','',1).isdigit():
+             pass # keep as number
+        else:
+             safe_pk = f"'{_sql_text(pk_value)}'"
+             
+        query = f"UPDATE {table_name} SET {set_clause} WHERE {pk_col.name} = {safe_pk}"
+        result = engine.execute(query)
+        
+        if not result.get('success'):
+             return jsonify({'success': False, 'error': result.get('error', 'Update failed')}), 400
+             
+        return jsonify({'success': True, 'message': 'Row updated'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/table/<table_name>/<path:pk_value>', methods=['DELETE'])
+def delete_table_row(table_name, pk_value):
+    """Delete a row from a table."""
+    try:
+        table_def = engine.storage.get_table(table_name)
+        if not table_def:
+             return jsonify({'success': False, 'error': f"Table '{table_name}' does not exist"}), 404
+             
+        # Find PK column
+        pk_col = next((col for col in table_def.columns if col.primary_key), None)
+        if not pk_col:
+            return jsonify({'success': False, 'error': 'Table has no Primary Key, cannot delete by ID'}), 400
+            
+        # Handle PK value type
+        safe_pk = pk_value
+        if pk_col.data_type.value in ('INT', 'FLOAT') and str(pk_value).replace('.','',1).isdigit():
+             pass # keep as number
+        else:
+             safe_pk = f"'{_sql_text(pk_value)}'"
+             
+        query = f"DELETE FROM {table_name} WHERE {pk_col.name} = {safe_pk}"
+        result = engine.execute(query)
+        
+        if not result.get('success'):
+             return jsonify({'success': False, 'error': result.get('error', 'Delete failed')}), 400
+             
+        return jsonify({'success': True, 'message': 'Row deleted'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/tables/create', methods=['POST'])
+def create_table():
+    """Create a new table generic endpoint."""
+    try:
+        data = request.json or {}
+        table_name = data.get('name')
+        columns = data.get('columns', []) # list of {name, type, pk, nn, uq}
+        
+        if not table_name:
+             return jsonify({'success': False, 'error': 'Table name required'}), 400
+        if not columns:
+             return jsonify({'success': False, 'error': 'Columns required'}), 400
+             
+        # Build CREATE TABLE SQL
+        col_defs = []
+        for col in columns:
+            c_name = col.get('name')
+            c_type = col.get('type')
+            c_pk = "PRIMARY KEY" if col.get('pk') else ""
+            c_nn = "NOT NULL" if col.get('nn') else ""
+            c_uq = "UNIQUE" if col.get('uq') else ""
+            
+            # Simple validation
+            if not c_name or not c_type: continue
+            
+            parts = [c_name, c_type, c_pk, c_nn, c_uq]
+            col_defs.append(" ".join(p for p in parts if p))
+            
+        if not col_defs:
+            return jsonify({'success': False, 'error': 'Invalid column definitions'}), 400
+            
+        cols_sql = ", ".join(col_defs)
+        query = f"CREATE TABLE {table_name} ({cols_sql})"
+        
+        result = engine.execute(query)
+        if not result.get('success'):
+             return jsonify({'success': False, 'error': result.get('error', 'Create table failed')}), 400
+             
+        return jsonify({'success': True, 'message': f"Table '{table_name}' created"})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+
+@app.route('/api/table/<table_name>/export', methods=['GET'])
+def export_table_csv(table_name):
+    """Export table data as CSV"""
+    try:
+        if table_name not in engine.storage.list_tables():
+            return jsonify({'success': False, 'error': f"Table '{table_name}' does not exist"}), 404
+            
+        result = engine.execute(f"SELECT * FROM {table_name}")
+        if not result.get('success'):
+            return jsonify({'success': False, 'error': result.get('error', 'Query failed')}), 400
+            
+        rows = result.get('rows', [])
+        if not rows:
+            return jsonify({'success': False, 'error': 'No data to export'}), 400
+            
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Header
+        headers = list(rows[0].keys())
+        writer.writerow(headers)
+        
+        # Rows
+        for row in rows:
+            writer.writerow([row.get(col) for col in headers])
+            
+        return jsonify({
+            'success': True,
+            'csv': output.getvalue(),
+            'filename': f"{table_name}_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/table/<table_name>/import', methods=['POST'])
+def import_table_csv(table_name):
+    """Import CSV data into table"""
+    try:
+        data = request.json or {}
+        csv_content = data.get('csv', '')
+        
+        if not csv_content:
+            return jsonify({'success': False, 'error': 'No CSV content provided'}), 400
+            
+        table_def = engine.storage.get_table(table_name)
+        if not table_def:
+             return jsonify({'success': False, 'error': f"Table '{table_name}' does not exist"}), 404
+             
+        # Parse CSV
+        f = io.StringIO(csv_content)
+        reader = csv.DictReader(f)
+        
+        success_count = 0
+        errors = []
+        
+        for i, row in enumerate(reader):
+            # Map CSV columns to table columns
+            # This implementation assumes CSV headers match column names
+            
+            # Simple sanitization/conversion
+            insert_data = {}
+            for col in table_def.columns:
+                if col.name in row:
+                    val = row[col.name]
+                    # Handle NULLs
+                    if val == '' or val.upper() == 'NULL':
+                        insert_data[col.name] = None
+                    else:
+                        insert_data[col.name] = val
+            
+            if not insert_data:
+                continue
+                
+            # Construct insert query (reusing logic would be better but keeping it simple)
+            cols = list(insert_data.keys())
+            vals = []
+            
+            for col_name in cols:
+                val = insert_data[col_name]
+                if isinstance(val, str):
+                    safe_val = _sql_text(val)
+                    vals.append(f"'{safe_val}'")
+                elif val is None:
+                    vals.append("NULL")
+                else:
+                     vals.append(str(val))
+
+            col_str = ", ".join(cols)
+            val_str = ", ".join(vals)
+            
+            query = f"INSERT INTO {table_name} ({col_str}) VALUES ({val_str})"
+            res = engine.execute(query)
+            
+            if res.get('success'):
+                success_count += 1
+            else:
+                errors.append(f"Row {i+1}: {res.get('error')}")
+                
+        return jsonify({
+            'success': True,
+            'imported': success_count,
+            'errors': errors[:5] if errors else None,
+            'message': f"Imported {success_count} rows"
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

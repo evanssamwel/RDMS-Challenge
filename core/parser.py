@@ -697,10 +697,13 @@ class SQLParser:
         return values
     
     def _split_by_comma(self, text: str) -> List[str]:
-        """Split by comma, respecting parentheses and quotes"""
+        """Split by comma, respecting parentheses, brackets, braces, and quotes"""
         parts = []
         current = []
         paren_depth = 0
+        bracket_depth = 0
+        brace_depth = 0
+        
         in_quotes = False
         quote_char = None
         
@@ -708,14 +711,24 @@ class SQLParser:
             if char in ('"', "'") and (not in_quotes or char == quote_char):
                 in_quotes = not in_quotes
                 quote_char = char if in_quotes else None
-            elif char == '(' and not in_quotes:
-                paren_depth += 1
-            elif char == ')' and not in_quotes:
-                paren_depth -= 1
-            elif char == ',' and paren_depth == 0 and not in_quotes:
-                parts.append(''.join(current))
-                current = []
-                continue
+            
+            elif not in_quotes:
+                if char == '(':
+                    paren_depth += 1
+                elif char == ')':
+                    paren_depth -= 1
+                elif char == '[':
+                    bracket_depth += 1
+                elif char == ']':
+                    bracket_depth -= 1
+                elif char == '{':
+                    brace_depth += 1
+                elif char == '}':
+                    brace_depth -= 1
+                elif char == ',' and paren_depth == 0 and bracket_depth == 0 and brace_depth == 0:
+                    parts.append(''.join(current))
+                    current = []
+                    continue
             
             current.append(char)
         

@@ -16,6 +16,7 @@ from enum import Enum
 from typing import Any, Optional, Union
 from datetime import datetime, date
 import re
+import json
 
 
 class DataType(Enum):
@@ -34,6 +35,8 @@ class DataType(Enum):
     FLOAT = "FLOAT"
     DATE = "DATE"
     BOOLEAN = "BOOLEAN"
+    TEXT = "TEXT"
+    JSON = "JSON"
     
     @classmethod
     def is_valid(cls, type_name: str) -> bool:
@@ -261,8 +264,27 @@ class Column:
                 f"Expected: true/false, yes/no, 1/0, or t/f"
             )
         
-        # Default: return as-is (should not reach here)
-        return value
+            raise ValueError(
+                f"Cannot convert '{value}' to BOOLEAN. "
+                f"Expected: true/false, yes/no, 1/0, or t/f"
+            )
+        
+        elif self.data_type == DataType.TEXT:
+            # TEXT is like VARCHAR but without length limit usually, allow anything
+            return str(value)
+
+        elif self.data_type == DataType.JSON:
+            # JSON validation
+            if isinstance(value, (dict, list)):
+                return value
+            
+            if isinstance(value, str):
+                try:
+                    return json.loads(value)
+                except json.JSONDecodeError as e:
+                     raise ValueError(f"Invalid JSON format for column '{self.name}': {e}. Value: {value!r}")
+            
+            raise ValueError(f"Cannot convert '{value}' to JSON. Expected dict, list, or valid JSON string.")
     
     def to_dict(self) -> dict:
         """

@@ -784,12 +784,56 @@ def get_financials():
             SELECT f.*, u.name as student_name
             FROM financials f
             INNER JOIN users u ON f.student_id = u.id
-            LIMIT 100
         """
     
     rows = db_rows(sql)
     log_action("API", "Fetch Financials", sql)
     return jsonify(rows)
+
+
+@app.route('/api/financials', methods=['POST'])
+def create_invoice():
+    """Create new financial record"""
+    data = request.json
+    try:
+        inv_id = random.randint(1000, 99999)
+        sql = f"""
+            INSERT INTO financials (id, student_id, semester, total_fees, fees_paid, balance, payment_date, payment_status)
+            VALUES ({inv_id}, {data['student_id']}, '{data['semester']}', {data['total_fees']}, 0, {data['total_fees']}, '{datetime.now().strftime('%Y-%m-%d')}', 'Unpaid')
+        """
+        db_exec(sql)
+        log_action("Financials", f"Created Invoice #{inv_id}", sql)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+
+
+@app.route('/api/financials/<int:id>/pay', methods=['PUT'])
+def pay_fees(id):
+    """Record fee payment"""
+    data = request.json
+    amount = float(data.get('amount', 0))
+    try:
+        # Get current state
+        rows = db_rows(f"SELECT * FROM financials WHERE id = {id}")
+        if not rows:
+            return jsonify({"success": False, "error": "Record not found"}), 404
+        
+        record = rows[0]
+        new_paid = record['fees_paid'] + amount
+        new_balance = record['total_fees'] - new_paid
+        status = 'Paid' if new_balance <= 0 else 'Partial'
+        
+        sql = f"""
+            UPDATE financials 
+            SET fees_paid = {new_paid}, balance = {new_balance}, payment_status = '{status}', payment_date = '{datetime.now().strftime('%Y-%m-%d')}'
+            WHERE id = {id}
+        """
+        db_exec(sql)
+        log_action("Financials", f"Payment Rec: {id}Amt: {amount}", sql)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 400
 
 
 @app.route('/api/attendance', methods=['GET'])
@@ -806,13 +850,13 @@ def get_attendance():
             INNER JOIN courses c ON a.course_id = c.id
             WHERE a.student_id = {student_id}
             ORDER BY a.date DESC
-            LIMIT 50
         """
     elif course_id:
         sql = f"""
             SELECT a.*, u.name as student_name
             FROM attendance a
             INNER JOIN users u ON a.student_id = u.id
+            INNER JOIN courses c ON a.course_id = c.id
             WHERE a.course_id = {course_id}
             ORDER BY a.date DESC
         """
@@ -823,12 +867,28 @@ def get_attendance():
             INNER JOIN users u ON a.student_id = u.id
             INNER JOIN courses c ON a.course_id = c.id
             ORDER BY a.date DESC
-            LIMIT 100
         """
     
     rows = db_rows(sql)
     log_action("API", "Fetch Attendance", sql)
     return jsonify(rows)
+
+
+@app.route('/api/attendance', methods=['POST'])
+def mark_attendance():
+    """Mark attendance"""
+    data = request.json
+    try:
+        att_id = random.randint(10000, 99999)
+        sql = f"""
+            INSERT INTO attendance (id, student_id, course_id, date, status, remarks)
+            VALUES ({att_id}, {data['student_id']}, {data['course_id']}, '{data['date']}', '{data['status']}', '{data.get('remarks', '')}')
+        """
+        db_exec(sql)
+        log_action("Attendance", "Mark Attendance", sql)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 400
 
 
 @app.route('/api/library/books', methods=['GET'])
@@ -838,6 +898,23 @@ def get_books():
     rows = db_rows(sql)
     log_action("API", "Fetch Books", sql)
     return jsonify(rows)
+
+
+@app.route('/api/library/books', methods=['POST'])
+def add_book():
+    """Add new book"""
+    data = request.json
+    try:
+        book_id = random.randint(1000, 99999)
+        sql = f"""
+            INSERT INTO books (id, title, author, isbn, category, total_copies, available_copies, shelf_location)
+            VALUES ({book_id}, '{data['title']}', '{data['author']}', '{data['isbn']}', '{data['category']}', {data['copies']}, {data['copies']}, '{data['shelf']}')
+        """
+        db_exec(sql)
+        log_action("Library", f"Add Book: {data['title']}", sql)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 400
 
 
 @app.route('/api/library/borrowings', methods=['GET'])
@@ -861,12 +938,68 @@ def get_borrowings():
             INNER JOIN books bk ON b.book_id = bk.id
             INNER JOIN users u ON b.student_id = u.id
             ORDER BY b.borrow_date DESC
-            LIMIT 100
         """
     
     rows = db_rows(sql)
     log_action("API", "Fetch Borrowings", sql)
     return jsonify(rows)
+
+
+@app.route('/api/library/borrowings', methods=['POST'])
+def issue_book():
+    """Issue book to student"""
+    data = request.json
+    try:
+        # Check availability
+        books = db_rows(f"SELECT available_copies FROM books WHERE id = {data['book_id']}")
+        if not books or books[0]['available_copies'] < 1:
+            return jsonify({"success": False, "error": "Book not available"}), 400
+
+        bor_id = random.randint(1000, 99999)
+        due_date = (datetime.now() + timedelta(days=14)).strftime('%Y-%m-%d')
+        
+        # Create borrowing
+        sql = f"""
+            INSERT INTO borrowings (id, student_id, book_id, borrow_date, due_date, status, fine)
+            VALUES ({bor_id}, {data['student_id']}, {data['book_id']}, '{datetime.now().strftime('%Y-%m-%d')}', '{due_date}', 'Borrowed', 0)
+        """
+        db_exec(sql)
+        
+        # Decrement stock
+        db_exec(f"UPDATE books SET available_copies = available_copies - 1 WHERE id = {data['book_id']}")
+        
+        log_action("Library", f"Issue Book: {data['book_id']} to {data['student_id']}", sql)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+
+
+@app.route('/api/library/borrowings/<int:id>/return', methods=['PUT'])
+def return_book(id):
+    """Return book"""
+    data = request.json
+    try:
+        # Get borrowing
+        rows = db_rows(f"SELECT book_id FROM borrowings WHERE id = {id}")
+        if not rows:
+            return jsonify({"success": False, "error": "Record not found"}), 404
+            
+        book_id = rows[0]['book_id']
+        
+        sql = f"""
+            UPDATE borrowings 
+            SET status = 'Returned', return_date = '{datetime.now().strftime('%Y-%m-%d')}'
+            WHERE id = {id}
+        """
+        db_exec(sql)
+        
+        # Increment stock
+        db_exec(f"UPDATE books SET available_copies = available_copies + 1 WHERE id = {book_id}")
+        
+        log_action("Library", f"Return Book: {id}", sql)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 400
 
 
 @app.route('/api/system-logs', methods=['GET'])

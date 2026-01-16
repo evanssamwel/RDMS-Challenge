@@ -1,26 +1,35 @@
 <!DOCTYPE html>
 <html lang="en" class="dark">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - School Management ERP</title>
-    
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
-    
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-        * { font-family: 'Inter', sans-serif; }
+
+        * {
+            font-family: 'Inter', sans-serif;
+        }
     </style>
 </head>
+
 <body class="bg-slate-950 text-gray-100 flex items-center justify-center min-h-screen p-4" x-data="loginApp()">
-    
-    <div class="w-full max-w-4xl grid md:grid-cols-2 bg-slate-900 rounded-2xl overflow-hidden shadow-2xl border border-slate-800">
-        
+
+    <div
+        class="w-full max-w-4xl grid md:grid-cols-2 bg-slate-900 rounded-2xl overflow-hidden shadow-2xl border border-slate-800">
+
         <!-- Left Side: Branding -->
-        <div class="relative bg-gradient-to-br from-blue-900 to-slate-900 p-12 flex flex-col justify-between hidden md:flex">
-            <div class="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1541339907198-e08756dedf3f?q=80&w=1000&auto=format&fit=crop')] opacity-10 bg-cover bg-center"></div>
+        <div
+            class="relative bg-gradient-to-br from-blue-900 to-slate-900 p-12 flex flex-col justify-between hidden md:flex">
+            <div
+                class="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1541339907198-e08756dedf3f?q=80&w=1000&auto=format&fit=crop')] opacity-10 bg-cover bg-center">
+            </div>
             <div class="relative z-10">
                 <div class="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center mb-6">
                     <i data-lucide="graduation-cap" class="w-6 h-6 text-white"></i>
@@ -29,92 +38,103 @@
                 <p class="text-blue-200">Powered by SimpleSQLDB</p>
             </div>
             <div class="relative z-10">
-                <blockquote class="text-lg italic text-gray-300 mb-4">"A production-grade RDBMS demonstration with complex relationships and real-time operations."</blockquote>
+                <blockquote class="text-lg italic text-gray-300 mb-4">"A production-grade RDBMS demonstration with
+                    complex relationships and real-time operations."</blockquote>
                 <div class="flex items-center space-x-2 text-sm text-gray-400">
                     <i data-lucide="shield-check" class="w-4 h-4"></i>
                     <span>Secure Access Portal</span>
                 </div>
             </div>
         </div>
-        
+
         <!-- Right Side: Login Form -->
         <div class="p-10 flex flex-col justify-center">
-            
+
             <div class="mb-8 text-center md:text-left">
                 <h2 class="text-2xl font-bold mb-2">Welcome Back</h2>
                 <p class="text-gray-400 text-sm">Please sign in to your account</p>
             </div>
-            
+
             <form @submit.prevent="login">
                 <div class="space-y-4 mb-6">
                     <div>
                         <label class="block text-sm font-semibold mb-2 text-gray-300">Email Address</label>
                         <div class="relative">
                             <i data-lucide="mail" class="absolute left-3 top-3 w-5 h-5 text-gray-500"></i>
-                            <input x-model="email" type="email" required placeholder="name@school.edu" 
+                            <input x-model="email" type="email" required placeholder="name@school.edu"
                                 class="w-full bg-slate-950 border border-slate-700 rounded-lg py-2.5 pl-10 pr-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
                         </div>
                     </div>
-                    
+
                     <div>
                         <label class="block text-sm font-semibold mb-2 text-gray-300">Password</label>
                         <div class="relative">
                             <i data-lucide="lock" class="absolute left-3 top-3 w-5 h-5 text-gray-500"></i>
-                            <input x-model="password" type="password" required placeholder="••••••••" 
+                            <input x-model="password" type="password" required placeholder="••••••••"
                                 class="w-full bg-slate-950 border border-slate-700 rounded-lg py-2.5 pl-10 pr-4 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="flex items-center justify-between mb-8">
                     <label class="flex items-center space-x-2 cursor-pointer">
-                        <input type="checkbox" class="w-4 h-4 rounded border-slate-700 bg-slate-950 text-blue-600 focus:ring-blue-500">
+                        <input type="checkbox"
+                            class="w-4 h-4 rounded border-slate-700 bg-slate-950 text-blue-600 focus:ring-blue-500">
                         <span class="text-xs text-gray-400">Remember me</span>
                     </label>
                     <a href="#" class="text-xs text-blue-400 hover:text-blue-300">Forgot Password?</a>
                 </div>
-                
-                <button type="submit" 
-                    :disabled="loading"
+
+                <button type="submit" :disabled="loading"
                     class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition flex items-center justify-center space-x-2 shadow-lg shadow-blue-900/20">
                     <i data-lucide="log-in" class="w-5 h-5" x-show="!loading"></i>
                     <i data-lucide="loader-2" class="w-5 h-5 animate-spin" x-show="loading" x-cloak></i>
                     <span x-text="loading ? 'Signing In...' : 'Sign In'"></span>
                 </button>
-                
+
                 <p x-show="error" x-text="error" class="text-red-400 text-sm text-center mt-4" x-cloak></p>
             </form>
-            
+
             <!-- Demo Credentials Box -->
             <div class="mt-8 p-4 bg-slate-800/50 rounded-lg border border-slate-700">
                 <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Demo Credentials</h3>
                 <div class="grid grid-cols-2 gap-2 text-xs">
-                    <button @click="fillCreds('admin@school.edu', 'admin123')" class="p-2 bg-slate-800 hover:bg-slate-700 rounded text-left transition border border-slate-700 hover:border-red-500/50">
+                    <button @click="fillCreds('admin@school.edu', 'admin123')"
+                        class="p-2 bg-slate-800 hover:bg-slate-700 rounded text-left transition border border-slate-700 hover:border-red-500/50">
                         <div class="font-bold text-gray-300">Admin</div>
                         <div class="text-gray-500">admin@school.edu</div>
                         <div class="text-gray-600 mt-0.5">admin123</div>
                     </button>
-                    <button @click="fillCreds('teacher@school.edu', 'teacher123')" class="p-2 bg-slate-800 hover:bg-slate-700 rounded text-left transition border border-slate-700 hover:border-cyan-500/50">
+                    <button @click="fillCreds('teacher@school.edu', 'teacher123')"
+                        class="p-2 bg-slate-800 hover:bg-slate-700 rounded text-left transition border border-slate-700 hover:border-cyan-500/50">
                         <div class="font-bold text-gray-300">Teacher</div>
                         <div class="text-gray-500">teacher@school.edu</div>
                         <div class="text-gray-600 mt-0.5">teacher123</div>
                     </button>
-                    <button @click="fillCreds('student@school.edu', 'student123')" class="p-2 bg-slate-800 hover:bg-slate-700 rounded text-left transition border border-slate-700 hover:border-purple-500/50">
+                    <button @click="fillCreds('student@school.edu', 'student123')"
+                        class="p-2 bg-slate-800 hover:bg-slate-700 rounded text-left transition border border-slate-700 hover:border-purple-500/50">
                         <div class="font-bold text-gray-300">Student</div>
                         <div class="text-gray-500">student@school.edu</div>
                         <div class="text-gray-600 mt-0.5">student123</div>
                     </button>
-                    <button @click="fillCreds('registrar@school.edu', 'registrar123')" class="p-2 bg-slate-800 hover:bg-slate-700 rounded text-left transition border border-slate-700 hover:border-orange-500/50">
-                        <div class="font-bold text-gray-300">Registrar</div>
-                        <div class="text-gray-500">registrar@school.edu</div>
-                        <div class="text-gray-600 mt-0.5">registrar123</div>
+                    <button @click="fillCreds('librarian@school.edu', 'librarian123')"
+                        class="p-2 bg-slate-800 hover:bg-slate-700 rounded text-left transition border border-slate-700 hover:border-teal-500/50">
+                        <div class="font-bold text-gray-300">Librarian</div>
+                        <div class="text-gray-500">librarian@school.edu</div>
+                        <div class="text-gray-600 mt-0.5">librarian123</div>
+                    </button>
+                    <button @click="fillCreds('accountant@school.edu', 'accountant123')"
+                        class="p-2 bg-slate-800 hover:bg-slate-700 rounded text-left transition border border-slate-700 hover:border-emerald-500/50">
+                        <div class="font-bold text-gray-300">Accountant</div>
+                        <div class="text-gray-500">accountant@school.edu</div>
+                        <div class="text-gray-600 mt-0.5">accountant123</div>
                     </button>
                 </div>
             </div>
-            
+
         </div>
     </div>
-    
+
     <script>
         function loginApp() {
             return {
@@ -122,38 +142,36 @@
                 password: '',
                 loading: false,
                 error: '',
-                
+
                 init() {
                     lucide.createIcons();
                 },
-                
+
                 fillCreds(e, p) {
                     this.email = e;
                     this.password = p;
                     this.error = '';
                 },
-                
+
                 async login() {
                     this.loading = true;
                     this.error = '';
-                    
+
                     try {
                         const response = await fetch('/login', {
                             method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
+                            headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                                 email: this.email,
                                 password: this.password
                             })
                         });
-                        
+
                         const result = await response.json();
-                        
+
                         if (result.success) {
-                            if (result.role === 'Admin') window.location.href = '/admin';
-                            else if (result.role === 'Teacher') window.location.href = '/teacher';
-                            else if (result.role === 'Student') window.location.href = '/student';
-                            else if (result.role === 'Registrar') window.location.href = '/registrar';
+                            if (result.role === 'Student') window.location.href = '/student';
+                            else window.location.href = '/admin';
                         } else {
                             this.error = result.error || 'Login failed';
                             this.loading = false;
@@ -167,4 +185,5 @@
         }
     </script>
 </body>
+
 </html>
