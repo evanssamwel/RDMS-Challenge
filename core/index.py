@@ -40,7 +40,8 @@ Limitations:
     - No block-level compression
     - No multi-column indexes (yet)
 """
-from typing import Any, Optional, List, Tuple
+from dataclasses import dataclass
+from typing import Any, Optional, List, Tuple, Dict, Iterable, Union
 import bisect
 
 
@@ -216,7 +217,14 @@ class BTreeIndex:
         self._delete_from_node(self.root, key, row_id)
     
     def _normalize_key(self, key: Any) -> Any:
-        """Normalize key for comparison"""
+        """Normalize key for comparison.
+
+        Supports scalar keys and composite tuple keys.
+        """
+        if isinstance(key, tuple):
+            return tuple(self._normalize_key(k) for k in key)
+        if isinstance(key, list):
+            return tuple(self._normalize_key(k) for k in key)
         if isinstance(key, str):
             return key.lower()  # Case-insensitive string comparison
         return key
@@ -330,45 +338,120 @@ class BTreeIndex:
                 pass
 
 
+@dataclass(frozen=True)
+class IndexDefinition:
+    name: str
+    columns: Tuple[str, ...]
+    index: BTreeIndex
+
+
 class IndexManager:
-    """Manage all indexes for a table"""
-    
+    """Manage all indexes for a table.
+
+    Supports:
+    - Single-column indexes (backwards compatible with existing APIs)
+    - Composite indexes across 2+ columns
+    - Named indexes (CREATE INDEX name ON table(colA, colB))
+    """
+
     def __init__(self):
-        self.indexes = {}  # column_name -> BTreeIndex
-    
-    def create_index(self, column_name: str) -> BTreeIndex:
-        """Create an index on a column"""
-        if column_name in self.indexes:
-            return self.indexes[column_name]
-        
-        index = BTreeIndex(column_name)
-        self.indexes[column_name] = index
+        self._by_name: Dict[str, IndexDefinition] = {}
+        self._by_columns: Dict[Tuple[str, ...], IndexDefinition] = {}
+
+    def create_index(self, columns: Union[str, Iterable[str]], name: Optional[str] = None) -> BTreeIndex:
+        """Create an index.
+
+        Args:
+            columns: Column name (string) or an iterable of column names.
+            name: Optional index name.
+
+        Returns:
+            The created or existing BTreeIndex.
+        """
+        if isinstance(columns, str):
+            cols = (columns,)
+        else:
+            cols = tuple(str(c).strip() for c in columns if str(c).strip())
+        if not cols:
+            raise ValueError("Index must have at least one column")
+
+        idx_name = (name or (cols[0] if len(cols) == 1 else "idx_" + "_".join(cols))).strip()
+        if idx_name in self._by_name:
+            return self._by_name[idx_name].index
+        if cols in self._by_columns:
+            # Already exists under a different name; re-use it.
+            existing = self._by_columns[cols]
+            self._by_name[idx_name] = existing
+            return existing.index
+
+        index = BTreeIndex(",".join(cols))
+        definition = IndexDefinition(name=idx_name, columns=cols, index=index)
+        self._by_name[idx_name] = definition
+        self._by_columns[cols] = definition
         return index
-    
+
     def get_index(self, column_name: str) -> Optional[BTreeIndex]:
-        """Get index for a column"""
-        return self.indexes.get(column_name)
-    
+        """Get index for a single column (backwards compatible)."""
+        definition = self._by_columns.get((column_name,))
+        return definition.index if definition else None
+
+    def get_index_by_name(self, name: str) -> Optional[BTreeIndex]:
+        definition = self._by_name.get(name)
+        return definition.index if definition else None
+
+    def get_index_for_columns(self, columns: Iterable[str]) -> Optional[BTreeIndex]:
+        cols = tuple(columns)
+        definition = self._by_columns.get(cols)
+        return definition.index if definition else None
+
+    def get_index_definition_for_columns(self, columns: Iterable[str]) -> Optional[IndexDefinition]:
+        cols = tuple(columns)
+        return self._by_columns.get(cols)
+
+    def list_indexes(self) -> List[IndexDefinition]:
+        # Unique by columns
+        return list(self._by_columns.values())
+
     def has_index(self, column_name: str) -> bool:
-        """Check if column has an index"""
-        return column_name in self.indexes
-    
+        """Check if a single-column index exists (backwards compatible)."""
+        return (column_name,) in self._by_columns
+
     def insert(self, row: dict, row_id: int):
-        """Insert row into all indexes"""
-        for column_name, index in self.indexes.items():
-            if column_name in row:
-                index.insert(row[column_name], row_id)
-    
+        """Insert row into all indexes."""
+        for definition in self._by_columns.values():
+            key = self._build_key(row, definition.columns)
+            if key is None:
+                continue
+            definition.index.insert(key, row_id)
+
     def delete(self, row: dict, row_id: int):
-        """Delete row from all indexes"""
-        for column_name, index in self.indexes.items():
-            if column_name in row:
-                index.delete(row[column_name], row_id)
-    
+        """Delete row from all indexes."""
+        for definition in self._by_columns.values():
+            key = self._build_key(row, definition.columns)
+            if key is None:
+                continue
+            definition.index.delete(key, row_id)
+
     def update(self, old_row: dict, new_row: dict, row_id: int):
-        """Update row in indexes"""
-        for column_name, index in self.indexes.items():
-            if column_name in old_row:
-                index.delete(old_row[column_name], row_id)
-            if column_name in new_row:
-                index.insert(new_row[column_name], row_id)
+        """Update row in indexes."""
+        for definition in self._by_columns.values():
+            old_key = self._build_key(old_row, definition.columns)
+            if old_key is not None:
+                definition.index.delete(old_key, row_id)
+
+            new_key = self._build_key(new_row, definition.columns)
+            if new_key is not None:
+                definition.index.insert(new_key, row_id)
+
+    def _build_key(self, row: dict, columns: Tuple[str, ...]) -> Optional[Any]:
+        values = []
+        for col in columns:
+            if col not in row:
+                return None
+            values.append(row.get(col))
+        # Conservative: if any component is NULL, don't index.
+        if any(v is None for v in values):
+            return None
+        if len(values) == 1:
+            return values[0]
+        return tuple(values)

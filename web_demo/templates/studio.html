@@ -815,7 +815,12 @@
                 
                 async deleteStudent(studentId) {
                     if (confirm('Are you sure?')) {
-                        await fetch(`/api/students/${studentId}`, {method: 'DELETE'});
+                        const res = await fetch(`/api/students/${studentId}`, {method: 'DELETE'});
+                        const data = await res.json();
+                        if (!data.success) {
+                            alert(data.error || 'Delete failed');
+                            return;
+                        }
                         await this.loadStudents();
                         await this.loadEnrollments();
                         this.$nextTick(() => lucide.createIcons());
@@ -980,27 +985,37 @@
                 
                 formatExplainOutput(plan) {
                     if (!plan) return '';
-                    let output = '<div class="terminal-label">═══════════════════════════════════════════</div>';
-                    output += '<div class="terminal-label">  QUERY EXECUTION PLAN</div>';
-                    output += '<div class="terminal-label">═══════════════════════════════════════════</div>';
-                    
-                    for (const [key, value] of Object.entries(plan)) {
-                        const formattedKey = key.replace(/_/g, ' ').toUpperCase();
-                        if (Array.isArray(value)) {
-                            output += `<div><span class="terminal-key">▸ ${formattedKey}:</span></div>`;
-                            value.forEach(item => {
-                                output += `<div style="margin-left: 20px;"><span class="terminal-value">  ├─ ${JSON.stringify(item)}</span></div>`;
-                            });
-                        } else if (typeof value === 'object' && value !== null) {
-                            output += `<div><span class="terminal-key">▸ ${formattedKey}:</span></div>`;
-                            for (const [k, v] of Object.entries(value)) {
-                                output += `<div style="margin-left: 20px;"><span class="terminal-value">  ├─ ${k}: ${JSON.stringify(v)}</span></div>`;
-                            }
-                        } else {
-                            output += `<div><span class="terminal-key">▸ ${formattedKey}:</span> <span class="terminal-value">${JSON.stringify(value)}</span></div>`;
+                    const esc = (s) => String(s)
+                        .replaceAll('&', '&amp;')
+                        .replaceAll('<', '&lt;')
+                        .replaceAll('>', '&gt;');
+
+                    const formatDetails = (details) => {
+                        if (!details) return '';
+                        if (typeof details === 'string') return esc(details);
+                        try { return esc(JSON.stringify(details)); } catch { return esc(String(details)); }
+                    };
+
+                    const walk = (node, prefix = '', isLast = true) => {
+                        const connector = isLast ? '└─ ' : '├─ ';
+                        const type = esc(node?.type || 'UNKNOWN');
+                        const details = formatDetails(node?.details);
+                        let line = `<div><span class="terminal-key">${esc(prefix + connector + type)}</span>`;
+                        if (details) line += ` <span class="terminal-value">${details}</span>`;
+                        line += `</div>`;
+
+                        const children = node?.children || [];
+                        const nextPrefix = prefix + (isLast ? '   ' : '│  ');
+                        for (let i = 0; i < children.length; i++) {
+                            line += walk(children[i], nextPrefix, i === children.length - 1);
                         }
-                    }
-                    
+                        return line;
+                    };
+
+                    let output = '<div class="terminal-label">═══════════════════════════════════════════</div>';
+                    output += '<div class="terminal-label">  QUERY EXECUTION PLAN (TREE)</div>';
+                    output += '<div class="terminal-label">═══════════════════════════════════════════</div>';
+                    output += walk(plan, '', true);
                     output += '<div class="terminal-label">═══════════════════════════════════════════</div>';
                     return output;
                 },

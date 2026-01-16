@@ -2445,6 +2445,18 @@ Instead of multiple separate applications, we built **one professional platform*
 
 ---
 
+## 🧩 Challenges Overcome
+
+This project intentionally tackles “hard parts” that show real database engineering judgement. A few notable challenges we hit and resolved:
+
+- **Windows-safe persistence**: implementing atomic writes (temp file + `os.replace`) and retry logic to avoid partial writes / file locks corrupting JSON tables.
+- **Index correctness vs. speed**: keeping B-tree indexes consistent across inserts/updates/deletes, plus making sure index rebuilds are stable when data changes.
+- **JOIN performance tradeoffs**: starting with a clear nested-loop join for correctness, then adding an index-aware join path when the right-side join column is indexed (Workbench-like “real DB” feel).
+- **Projection vs. ORDER BY correctness**: enabling earlier projection to reduce row width before sorting while still preserving ORDER BY columns when they’re not in the final SELECT list.
+- **Failure safety on INSERT**: adding a transaction-light rollback so a partially-failed insert (e.g., index update or disk write) doesn’t leave the table in a half-updated state.
+- **Explain-plan UX**: aligning the planner output between CLI and Web Studio, and rendering a readable plan tree to make optimizations visible to reviewers.
+
+
 ## 📊 Test Coverage
 
 **23 Passing Tests** covering:

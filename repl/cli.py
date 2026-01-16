@@ -257,111 +257,35 @@ class REPL:
         for row in rows:
             row_str = ' | '.join(str(row.get(col, '')).ljust(widths[col]) for col in columns)
             print(row_str)
-    
+
     def _explain_query(self, sql: str):
-        """
-        Show query execution plan for SELECT statements.
-        
-        Displays:
-        - Query type (SELECT, JOIN, aggregate)
-        - Table access method (full scan vs index lookup)
-        - Index usage for WHERE clauses
-        - JOIN type and strategy
-        - Aggregation and grouping details
-        """
-        print("\n--- Query Execution Plan ---\n")
-        
-        from core.parser import SQLParser
-        parser = SQLParser()
-        
+        """Explain a query by printing the engine's structured plan."""
         try:
-            parsed = parser.parse(sql)
-            
-            if parsed['type'].name != 'SELECT':
-                print(f"EXPLAIN only supports SELECT queries (got {parsed['type'].name})")
-                return
-            
-            table_name = parsed['table']
-            table = self.storage.get_table(table_name)
-            
-            if not table:
-                print(f"Table {table_name} does not exist")
-                return
-            
-            # Query type
-            if parsed['joins']:
-                print(f"Query Type: SELECT with JOIN")
-            elif parsed['aggregates'] or parsed['group_by']:
-                print(f"Query Type: SELECT with Aggregation")
-            else:
-                print(f"Query Type: Simple SELECT")
-            
-            # Main table access
-            print(f"\nTable: {table_name}")
-            
-            # Check for index usage in WHERE clause
-            if parsed['where']:
-                where_col = parsed['where'].get('column')
-                if where_col:
-                    # Check if column has an index
-                    if where_col in self.storage.indexes.get(table_name, {}):
-                        print(f"  Access Method: Index Scan on {where_col}")
-                        print(f"  Index: {where_col}_idx")
-                    else:
-                        print(f"  Access Method: Full Table Scan")
-                        print(f"  Filter: {where_col} {parsed['where']['operator']} {parsed['where']['value']}")
-            else:
-                print(f"  Access Method: Full Table Scan")
-            
-            # JOIN details
-            if parsed['joins']:
-                print(f"\nJOINs:")
-                for join in parsed['joins']:
-                    print(f"  - {join['type'].name}: {join['table']}")
-                    print(f"    Condition: {join['on']['left_col']} = {join['on']['right_col']}")
-                    
-                    # Check if join column is indexed
-                    join_table = self.storage.get_table(join['table'])
-                    if join_table:
-                        right_col = join['on']['right_col'].split('.')[-1]
-                        if right_col in self.storage.indexes.get(join['table'], {}):
-                            print(f"    Strategy: Index Nested Loop (indexed on {right_col})")
-                        else:
-                            print(f"    Strategy: Nested Loop (no index)")
-            
-            # Aggregate details
-            if parsed['aggregates']:
-                print(f"\nAggregation:")
-                for agg in parsed['aggregates']:
-                    col_str = agg['column'] if agg['column'] else '*'
-                    print(f"  - {agg['function']}({col_str}) AS {agg['alias']}")
-            
-            if parsed['group_by']:
-                print(f"\nGrouping:")
-                print(f"  GROUP BY: {', '.join(parsed['group_by'])}")
-                
-                if parsed['having']:
-                    having = parsed['having']
-                    print(f"  HAVING: {having['column']} {having['operator']} {having['value']}")
-            
-            # Output details
-            if parsed['columns'] != ['*']:
-                print(f"\nColumns: {', '.join(parsed['columns'])}")
-            else:
-                print(f"\nColumns: * (all)")
-            
-            if parsed['order_by']:
-                order_cols = [f"{col} {direction}" for col, direction in parsed['order_by']]
-                print(f"Order By: {', '.join(order_cols)}")
-            
-            if parsed['limit']:
-                print(f"Limit: {parsed['limit']}")
-            
+            plan = self.engine.explain(sql)
             print()
-            
+            self._print_plan_tree(plan)
+            print()
         except Exception as e:
-            print(f"Error parsing query: {e}")
-            print()
+            print(f"Error generating explain plan: {e}")
+
+    def _print_plan_tree(self, node: dict, prefix: str = "", is_last: bool = True):
+        """Pretty-print a plan tree returned by QueryEngine.explain()."""
+        if not node:
+            return
+
+        connector = "└─ " if is_last else "├─ "
+        node_type = node.get('type', 'UNKNOWN')
+        details = node.get('details')
+        label = node_type
+        if details:
+            label = f"{node_type} {details}"
+        print(prefix + connector + label)
+
+        children = node.get('children') or []
+        next_prefix = prefix + ("   " if is_last else "│  ")
+        for i, child in enumerate(children):
+            self._print_plan_tree(child, next_prefix, i == len(children) - 1)
+
 
 
 def main():

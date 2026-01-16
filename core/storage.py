@@ -178,6 +178,11 @@ class Storage:
             raise ValueError(f"Table '{table_name}' does not exist")
         
         table = self.tables[table_name]
+
+        # Generated columns are computed; they cannot be inserted directly.
+        for col in table.columns:
+            if col.generated_expr and col.name in row:
+                raise ValueError(f"Cannot insert into generated column '{col.name}'")
         
         # Validate row against schema (type conversion, NOT NULL checks)
         validated_row = table.validate_row(row)
@@ -195,15 +200,37 @@ class Storage:
         
         # Add to in-memory data structure
         self.data[table_name].append(validated_row)
-        
-        # Update indexes with new row
-        self.indexes[table_name].insert(validated_row, row_id)
-        
-        # Persist to disk
-        self._save_table_data(table_name)
-        
-        # Update row count metadata
-        table.row_count += 1
+
+        try:
+            # Update indexes with new row
+            self.indexes[table_name].insert(validated_row, row_id)
+
+            # Persist to disk
+            self._save_table_data(table_name)
+
+            # Update row count metadata
+            table.row_count += 1
+        except Exception:
+            # Best-effort rollback: remove row and index entries.
+            try:
+                self.indexes[table_name].delete(validated_row, row_id)
+            except Exception:
+                pass
+
+            try:
+                # Remove the inserted row if it still exists.
+                self.data[table_name] = [r for r in self.data[table_name] if r.get('_row_id') != row_id]
+            except Exception:
+                pass
+
+            # Rewind row id generator if this was the last assigned id.
+            try:
+                if self.next_row_ids.get(table_name) == row_id + 1:
+                    self.next_row_ids[table_name] = row_id
+            except Exception:
+                pass
+
+            raise
         
         return row_id
     
@@ -217,25 +244,35 @@ class Storage:
         if condition is None:
             return [self._remove_internal_fields(row) for row in rows]
         
-        # Try to use index if available
-        if 'column' in condition and condition['operator'] == '=':
-            column = condition['column']
-            value = condition['value']
-            
-            # Convert value to proper type
-            col_def = self.tables[table_name].get_column(column)
-            if col_def:
-                try:
-                    value = col_def.convert(value)
-                except:
-                    pass
-            
+        # Try to use index if available (single-column or composite) for equality predicates
+        eq_map = self._extract_equality_conditions(condition)
+        if eq_map:
+            # Convert values to proper types
+            converted = {}
+            table = self.tables[table_name]
+            for col, value in eq_map.items():
+                col_def = table.get_column(col)
+                if col_def:
+                    try:
+                        value = col_def.convert(value)
+                    except Exception:
+                        pass
+                converted[col] = value
+
             index_mgr = self.indexes[table_name]
-            if index_mgr.has_index(column):
-                # Use index
-                index = index_mgr.get_index(column)
-                row_ids = index.search(value)
-                matching_rows = [row for row in rows if row['_row_id'] in row_ids]
+            best_def = None
+            for idx_def in index_mgr.list_indexes():
+                if all(c in converted for c in idx_def.columns):
+                    if best_def is None or len(idx_def.columns) > len(best_def.columns):
+                        best_def = idx_def
+
+            if best_def is not None:
+                if len(best_def.columns) == 1:
+                    key = converted[best_def.columns[0]]
+                else:
+                    key = tuple(converted[c] for c in best_def.columns)
+                row_ids = best_def.index.search(key)
+                matching_rows = [row for row in rows if row['_row_id'] in set(row_ids)]
                 return [self._remove_internal_fields(row) for row in matching_rows]
         
         # Full table scan
@@ -249,6 +286,11 @@ class Storage:
         
         table = self.tables[table_name]
         rows = self.data[table_name]
+
+        # Generated columns are computed; they cannot be updated directly.
+        for col in table.columns:
+            if col.generated_expr and col.name in updates:
+                raise ValueError(f"Cannot update generated column '{col.name}'")
         
         # Find rows to update
         rows_to_update = []
@@ -266,6 +308,14 @@ class Storage:
                 col_def = table.get_column(col_name)
                 if col_def:
                     row[col_name] = col_def.convert(value)
+
+            # Recompute generated columns (if any) based on updated values
+            try:
+                validated = table.validate_row(row)
+                for k, v in validated.items():
+                    row[k] = v
+            except (ValueError, TypeError) as e:
+                raise ValueError(str(e))
             
             # Check unique constraints
             self._check_unique_constraints(table_name, row, exclude_row_id=row['_row_id'])
@@ -302,9 +352,9 @@ class Storage:
             if condition is None or self._matches_condition(row, condition, table_name):
                 rows_to_delete.append(row)
         
-        # Check if any rows are referenced by foreign keys
+        # Apply foreign key ON DELETE actions (RESTRICT/CASCADE/SET NULL)
         if table.primary_key:
-            self._check_referential_integrity(table_name, rows_to_delete, table.primary_key)
+            self._apply_on_delete_actions(table_name, rows_to_delete, table.primary_key)
         
         # Delete rows
         for row in rows_to_delete:
@@ -319,23 +369,73 @@ class Storage:
         
         return len(rows_to_delete)
     
-    def create_index(self, table_name: str, column_name: str):
-        """Create an index on a column"""
+    def create_index(self, table_name: str, columns, index_name: Optional[str] = None):
+        """Create an index on one or more columns."""
         if table_name not in self.tables:
             raise ValueError(f"Table {table_name} does not exist")
-        
+
+        if isinstance(columns, str):
+            cols = [columns]
+        else:
+            cols = list(columns)
+        if not cols:
+            raise ValueError("Index must specify at least one column")
+
         table = self.tables[table_name]
-        if not table.get_column(column_name):
-            raise ValueError(f"Column {column_name} does not exist in table {table_name}")
-        
+        for col in cols:
+            if not table.get_column(col):
+                raise ValueError(f"Column {col} does not exist in table {table_name}")
+
         # Create index
         index_mgr = self.indexes[table_name]
-        index = index_mgr.create_index(column_name)
-        
+        index = index_mgr.create_index(cols, name=index_name)
+
         # Build index from existing data
         for row in self.data[table_name]:
-            if column_name in row:
-                index.insert(row[column_name], row['_row_id'])
+            key_parts = []
+            missing = False
+            for col in cols:
+                if col not in row:
+                    missing = True
+                    break
+                key_parts.append(row.get(col))
+            if missing or any(v is None for v in key_parts):
+                continue
+            key = key_parts[0] if len(key_parts) == 1 else tuple(key_parts)
+            index.insert(key, row['_row_id'])
+
+        # Persist updated schema (includes indexes metadata)
+        self._save_table_schema(self.tables[table_name])
+
+    def _unqualify_column(self, name: str) -> str:
+        return name.split('.')[-1]
+
+    def _extract_equality_conditions(self, condition: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        """Extract simple equality predicates from a WHERE condition tree.
+
+        Supports:
+        - single condition: {'column': 'a', 'operator': '=', 'value': 1}
+        - AND-chains: {'conditions': [...], 'operators': ['AND', ...]}
+        """
+        if not condition:
+            return None
+
+        if 'column' in condition and condition.get('operator') == '=':
+            return {self._unqualify_column(condition['column']): condition.get('value')}
+
+        if 'conditions' in condition:
+            ops = condition.get('operators') or []
+            if any(op != 'AND' for op in ops):
+                return None
+            merged: Dict[str, Any] = {}
+            for child in condition.get('conditions') or []:
+                m = self._extract_equality_conditions(child)
+                if not m:
+                    return None
+                merged.update(m)
+            return merged
+
+        return None
     
     def _check_unique_constraints(self, table_name: str, row: Dict[str, Any], exclude_row_id: Optional[int] = None):
         """Check unique constraints for a row"""
@@ -394,42 +494,68 @@ class Storage:
                         f"Value {value} does not exist in {ref_table}.{ref_column}"
                     )
     
-    def _check_referential_integrity(self, table_name: str, rows_to_delete: List[Dict], pk_column: str):
+    def _apply_on_delete_actions(self, table_name: str, rows_to_delete: List[Dict], pk_column: str):
+        """Apply ON DELETE actions for foreign key references.
+
+        Default behavior is RESTRICT (existing behavior): prevent deletes when referenced.
+        Supported actions:
+        - RESTRICT: raise if referenced
+        - CASCADE: delete referencing rows
+        - SET NULL: set referencing FK columns to NULL (if allowed)
         """
-        Check if deleting rows would violate foreign key constraints.
-        
-        Prevents deletion of rows that are referenced by foreign keys in other tables.
-        
-        Args:
-            table_name: Table from which rows are being deleted
-            rows_to_delete: List of rows to delete
-            pk_column: Primary key column name
-            
-        Raises:
-            ValueError: If deletion would violate foreign key constraint
-        """
-        # Get primary key values being deleted
+        if not rows_to_delete:
+            return
+
         pk_values = {row[pk_column] for row in rows_to_delete}
-        
-        # Check all other tables for foreign key references
+        if not pk_values:
+            return
+
         for other_table_name, other_table in self.tables.items():
             if other_table_name == table_name:
                 continue
-            
-            # Check if this table has foreign keys referencing the table being deleted from
+
             for column in other_table.columns:
-                if column.foreign_key:
-                    ref_table, ref_column = column.foreign_key
-                    if ref_table == table_name and ref_column == pk_column:
-                        # Found a foreign key reference - check if any rows reference deleted values
-                        other_rows = self.data[other_table_name]
-                        for other_row in other_rows:
-                            fk_value = other_row.get(column.name)
-                            if fk_value in pk_values:
-                                raise ValueError(
-                                    f"Cannot delete from {table_name}: "
-                                    f"row is referenced by {other_table_name}.{column.name}"
-                                )
+                if not column.foreign_key:
+                    continue
+                ref_table, ref_column = column.foreign_key
+                if ref_table != table_name or ref_column != pk_column:
+                    continue
+
+                # Identify referencing rows
+                other_rows = self.data[other_table_name]
+                has_refs = any(other_row.get(column.name) in pk_values for other_row in other_rows)
+                if not has_refs:
+                    continue
+
+                action = (column.foreign_key_on_delete or 'RESTRICT').upper()
+                if action == 'RESTRICT':
+                    raise ValueError(
+                        f"Cannot delete from {table_name}: "
+                        f"row is referenced by {other_table_name}.{column.name}"
+                    )
+
+                if action == 'SET NULL':
+                    if column.not_null:
+                        raise ValueError(
+                            f"Cannot SET NULL on {other_table_name}.{column.name}: column is NOT NULL"
+                        )
+                    cond = self._build_or_equals_condition(column.name, pk_values)
+                    self.update_rows(other_table_name, {column.name: None}, cond)
+                    continue
+
+                if action == 'CASCADE':
+                    cond = self._build_or_equals_condition(column.name, pk_values)
+                    self.delete_rows(other_table_name, cond)
+                    continue
+
+                raise ValueError(f"Unsupported ON DELETE action: {action}")
+
+    def _build_or_equals_condition(self, column_name: str, values) -> Dict[str, Any]:
+        values_list = list(values)
+        if len(values_list) == 1:
+            return {'column': column_name, 'operator': '=', 'value': values_list[0]}
+        conditions = [{'column': column_name, 'operator': '=', 'value': v} for v in values_list]
+        return {'conditions': conditions, 'operators': ['OR'] * (len(conditions) - 1)}
     
     def _matches_condition(self, row: Dict[str, Any], condition: Dict[str, Any], table_name: str) -> bool:
         """Check if a row matches a condition"""
@@ -499,7 +625,14 @@ class Storage:
         """Save table schema to disk"""
         schema_file = self.data_dir / f"{table.name}.schema.json"
         with open(schema_file, 'w') as f:
-            json.dump(table.to_dict(), f, indent=2)
+            data = table.to_dict()
+            # Persist indexes so they can be rebuilt on restart (including composite indexes)
+            idx_mgr = self.indexes.get(table.name)
+            if idx_mgr:
+                data['indexes'] = [
+                    {'name': idx.name, 'columns': list(idx.columns)} for idx in idx_mgr.list_indexes()
+                ]
+            json.dump(data, f, indent=2)
     
     def _save_table_data(self, table_name: str):
         """Save table data to disk with atomic write"""
@@ -556,10 +689,18 @@ class Storage:
             # Rebuild indexes
             index_mgr = IndexManager()
             if table.primary_key:
-                index_mgr.create_index(table.primary_key)
+                index_mgr.create_index(table.primary_key, name=table.primary_key)
             for col_name in table.unique_columns:
                 if col_name != table.primary_key:
-                    index_mgr.create_index(col_name)
+                    index_mgr.create_index(col_name, name=col_name)
+
+            # Load any additional indexes from schema (e.g. CREATE INDEX)
+            for idx in schema_data.get('indexes', []) or []:
+                try:
+                    index_mgr.create_index(idx.get('columns') or [], name=idx.get('name'))
+                except Exception:
+                    # Be conservative: skip invalid index definitions.
+                    continue
             
             # Populate indexes
             for row in self.data[table_name]:

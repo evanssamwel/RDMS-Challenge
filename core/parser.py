@@ -214,7 +214,7 @@ class SQLParser:
             )
         """
         # Pattern: CREATE TABLE table_name (column_definitions)
-        match = re.match(r'CREATE TABLE\s+(\w+)\s*\((.*)\)', sql, re.IGNORECASE | re.DOTALL)
+        match = re.match(r'CREATE TABLE\s+([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?)\s*\((.*)\)', sql, re.IGNORECASE | re.DOTALL)
         if not match:
             raise ValueError(
                 "Invalid CREATE TABLE syntax. "
@@ -244,7 +244,9 @@ class SQLParser:
             if not col_def:
                 continue
             
-            # Parse: column_name data_type [(length)] [PRIMARY KEY] [UNIQUE] [NOT NULL] [REFERENCES table(column)]
+            # Parse: column_name data_type [(length)] [PRIMARY KEY] [UNIQUE] [NOT NULL]
+            #        [REFERENCES table(column) [ON DELETE (RESTRICT|CASCADE|SET NULL)]]
+            #        [GENERATED ALWAYS AS (expr) VIRTUAL]
             parts = col_def.split()
             if len(parts) < 2:
                 raise ValueError(f"Invalid column definition: {col_def}")
@@ -272,12 +274,33 @@ class SQLParser:
             unique = 'UNIQUE' in col_def_upper
             not_null = 'NOT NULL' in col_def_upper
             
-            # Parse foreign key: REFERENCES table(column)
+            # Parse foreign key: REFERENCES table(column) [ON DELETE action]
             foreign_key = None
+            foreign_key_on_delete = None
             if 'REFERENCES' in col_def_upper:
-                ref_match = re.search(r'REFERENCES\s+(\w+)\s*\((\w+)\)', col_def, re.IGNORECASE)
+                ref_match = re.search(
+                    r'REFERENCES\s+([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?)\s*\((\w+)\)'
+                    r'(?:\s+ON\s+DELETE\s+(RESTRICT|CASCADE|SET\s+NULL))?\b',
+                    col_def,
+                    re.IGNORECASE,
+                )
                 if ref_match:
                     foreign_key = (ref_match.group(1), ref_match.group(2))
+                    action = ref_match.group(3)
+                    if action:
+                        foreign_key_on_delete = action.replace(' ', '_').upper().replace('_', ' ')
+
+            # Parse VIRTUAL generated column
+            generated_expr = None
+            generated_virtual = False
+            gen_match = re.search(
+                r'(?:GENERATED\s+ALWAYS\s+)?AS\s*\((.+?)\)\s+VIRTUAL\b',
+                col_def,
+                re.IGNORECASE | re.DOTALL,
+            )
+            if gen_match:
+                generated_expr = gen_match.group(1).strip()
+                generated_virtual = True
             
             column = Column(
                 name=col_name,
@@ -286,7 +309,10 @@ class SQLParser:
                 primary_key=primary_key,
                 unique=unique,
                 not_null=not_null,
-                foreign_key=foreign_key
+                foreign_key=foreign_key,
+                foreign_key_on_delete=foreign_key_on_delete,
+                generated_expr=generated_expr,
+                generated_virtual=generated_virtual,
             )
             columns.append(column)
         
@@ -298,7 +324,7 @@ class SQLParser:
         # Also support: INSERT INTO table_name VALUES (values)
         
         match = re.match(
-            r'INSERT INTO\s+(\w+)\s*(?:\((.*?)\))?\s*VALUES\s*\((.*?)\)',
+            r'INSERT INTO\s+([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?)\s*(?:\((.*?)\))?\s*VALUES\s*\((.*?)\)',
             sql,
             re.IGNORECASE | re.DOTALL
         )
@@ -439,7 +465,7 @@ class SQLParser:
 
         # No JOIN present: simple table reference
         if 'JOIN' not in upper:
-            main_match = re.match(r'^(\w+)', clause)
+            main_match = re.match(r'^([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?)', clause)
             if not main_match:
                 raise ValueError(f"Invalid FROM clause: {from_clause}")
             result['table'] = main_match.group(1)
@@ -452,7 +478,7 @@ class SQLParser:
 
         # Text before the first JOIN keyword is the main table
         main_part = clause[:join_kw_match.start()].strip()
-        main_match = re.match(r'^(\w+)', main_part)
+        main_match = re.match(r'^([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?)', main_part)
         if not main_match:
             raise ValueError(f"Invalid main table in FROM clause: {from_clause}")
         result['table'] = main_match.group(1)
@@ -462,7 +488,7 @@ class SQLParser:
 
         # Iterate over JOIN clauses and extract join type, table, and condition
         join_iter = re.finditer(
-            r'\b((?:INNER\s+JOIN|LEFT\s+JOIN|JOIN))\b\s+(\w+)\s+ON\s+(.+?)(?=(?:\s+(?:INNER\s+JOIN|LEFT\s+JOIN|JOIN)\b)|$)',
+            r'\b((?:INNER\s+JOIN|LEFT\s+JOIN|JOIN))\b\s+([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?)\s+ON\s+(.+?)(?=(?:\s+(?:INNER\s+JOIN|LEFT\s+JOIN|JOIN)\b)|$)',
             remaining,
             flags=re.IGNORECASE | re.DOTALL
         )
@@ -551,7 +577,7 @@ class SQLParser:
         # Pattern: UPDATE table_name SET col1=val1, col2=val2 WHERE condition
         
         match = re.match(
-            r'UPDATE\s+(\w+)\s+SET\s+(.+?)(?:\s+WHERE\s+(.+))?$',
+            r'UPDATE\s+([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?)\s+SET\s+(.+?)(?:\s+WHERE\s+(.+))?$',
             sql,
             re.IGNORECASE | re.DOTALL
         )
@@ -595,7 +621,7 @@ class SQLParser:
         # Pattern: DELETE FROM table_name WHERE condition
         
         match = re.match(
-            r'DELETE FROM\s+(\w+)(?:\s+WHERE\s+(.+))?$',
+            r'DELETE FROM\s+([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?)(?:\s+WHERE\s+(.+))?$',
             sql,
             re.IGNORECASE | re.DOTALL
         )
@@ -621,18 +647,23 @@ class SQLParser:
         # Pattern: CREATE INDEX index_name ON table_name (column)
         
         match = re.match(
-            r'CREATE INDEX\s+(\w+)\s+ON\s+(\w+)\s*\((\w+)\)',
+            r'CREATE INDEX\s+(\w+)\s+ON\s+([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?)\s*\((.*?)\)\s*$',
             sql,
             re.IGNORECASE
         )
         if not match:
             raise ValueError("Invalid CREATE INDEX syntax")
+
+        columns_str = match.group(3)
+        columns = [c.strip() for c in self._split_by_comma(columns_str) if c.strip()]
+        if not columns:
+            raise ValueError("CREATE INDEX must specify at least one column")
         
         return {
             'type': StatementType.CREATE_INDEX,
             'index_name': match.group(1),
             'table': match.group(2),
-            'column': match.group(3)
+            'columns': columns,
         }
     
     def _parse_values(self, values_str: str) -> List[Any]:

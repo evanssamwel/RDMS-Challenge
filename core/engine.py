@@ -187,6 +187,150 @@ class QueryEngine:
             # Return error without re-raising
             return {'success': False, 'error': str(e)}
 
+    def explain(self, sql: str) -> Dict[str, Any]:
+        """Return a structured execution plan for a SQL statement.
+
+        This is a lightweight, deterministic planner meant for demos and UX.
+        It does not execute the query.
+        """
+        parsed = self.parser.parse(sql)
+        stmt_type = parsed.get('type')
+
+        # Only SELECT has a meaningful plan today.
+        if stmt_type != StatementType.SELECT:
+            return {
+                'type': 'STATEMENT',
+                'statement': str(stmt_type),
+                'details': 'Explain plans are currently supported for SELECT only.',
+                'children': [],
+            }
+
+        return self._build_select_plan(parsed)
+
+    def _build_select_plan(self, parsed: Dict[str, Any]) -> Dict[str, Any]:
+        """Build a plan tree for SELECT."""
+        table = parsed['table']
+        where = parsed.get('where')
+        joins = parsed.get('joins') or []
+        order_by = parsed.get('order_by')
+        limit = parsed.get('limit')
+        columns = parsed.get('columns') or ['*']
+        aggregates = parsed.get('aggregates') or []
+        group_by = parsed.get('group_by') or []
+
+        root: Dict[str, Any] = {
+            'type': 'SELECT',
+            'details': {'from': table},
+            'children': [],
+        }
+
+        # Aggregates/GROUP BY are executed via a separate path; still show a simple plan.
+        if aggregates or group_by:
+            root['details']['mode'] = 'aggregate'
+
+        # Base access path
+        access_node = self._plan_access_path(table, where)
+        current = access_node
+
+        # JOINs
+        for join in joins:
+            join_table = join['table']
+            join_type = join['type']
+            on = join['on']
+            left_key = on.get('left')
+            right_key = on.get('right')
+            right_col = self._unqualify_column(right_key)
+
+            method = 'NESTED_LOOP'
+            try:
+                if join_table in self.storage.indexes and right_col and self.storage.indexes[join_table].has_index(right_col):
+                    method = 'INDEX_LOOKUP'
+            except Exception:
+                method = 'NESTED_LOOP'
+
+            join_node: Dict[str, Any] = {
+                'type': 'JOIN',
+                'details': {
+                    'join_type': str(join_type),
+                    'table': join_table,
+                    'on': {'left': left_key, 'right': right_key},
+                    'method': method,
+                },
+                'children': [current, {'type': 'SCAN', 'details': {'table': join_table}, 'children': []}],
+            }
+            current = join_node
+
+        # GROUP BY / AGG
+        if aggregates or group_by:
+            agg_node: Dict[str, Any] = {
+                'type': 'AGGREGATE',
+                'details': {
+                    'group_by': group_by,
+                    'aggregates': aggregates,
+                },
+                'children': [current],
+            }
+            current = agg_node
+
+        # ORDER BY
+        if order_by:
+            sort_node: Dict[str, Any] = {
+                'type': 'SORT',
+                'details': {'order_by': order_by},
+                'children': [current],
+            }
+            current = sort_node
+
+        # LIMIT
+        if limit:
+            limit_node: Dict[str, Any] = {
+                'type': 'LIMIT',
+                'details': {'limit': limit},
+                'children': [current],
+            }
+            current = limit_node
+
+        # PROJECTION
+        if columns != ['*']:
+            proj_node: Dict[str, Any] = {
+                'type': 'PROJECTION',
+                'details': {'columns': columns},
+                'children': [current],
+            }
+            current = proj_node
+
+        root['children'].append(current)
+        return root
+
+    def _plan_access_path(self, table: str, where: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """Choose a basic access path node: INDEX_LOOKUP vs SCAN (+ optional FILTER)."""
+        if where and where.get('operator') == '=' and 'column' in where:
+            col = where.get('column')
+            try:
+                if table in self.storage.indexes and self.storage.indexes[table].has_index(col):
+                    return {
+                        'type': 'INDEX_LOOKUP',
+                        'details': {'table': table, 'column': col, 'operator': '=', 'value': where.get('value')},
+                        'children': [],
+                    }
+            except Exception:
+                pass
+
+        scan: Dict[str, Any] = {'type': 'SCAN', 'details': {'table': table}, 'children': []}
+        if where:
+            return {
+                'type': 'FILTER',
+                'details': {'where': where},
+                'children': [scan],
+            }
+        return scan
+
+    def _unqualify_column(self, name: Optional[str]) -> Optional[str]:
+        if not name:
+            return None
+        # Accept either "col" or "table.col"
+        return name.split('.')[-1]
+
     def _execute_create_database(self, parsed: Dict[str, Any]) -> Dict[str, Any]:
         if self.database_manager is None:
             return {'success': False, 'error': 'Multi-database mode is not enabled'}
@@ -298,14 +442,24 @@ class QueryEngine:
         
         # Simple SELECT without aggregates
         rows = self.storage.select_rows(table_name, parsed['where'])
-        
-        # Apply column selection
-        if parsed['columns'] != ['*']:
-            rows = self._select_columns(rows, parsed['columns'])
-        
-        # Apply ORDER BY
-        if parsed['order_by']:
+
+        # Earlier projection before sorting (keep ORDER BY column if needed)
+        if parsed['columns'] != ['*'] and parsed['order_by']:
+            requested = parsed['columns']
+            order_col = parsed['order_by'].strip().split()[0]
+            needed = list(dict.fromkeys(requested + [order_col]))
+            rows = self._select_columns(rows, needed)
             rows = self._apply_order_by(rows, parsed['order_by'])
+            if needed != requested:
+                rows = self._select_columns(rows, requested)
+        else:
+            # Apply column selection
+            if parsed['columns'] != ['*']:
+                rows = self._select_columns(rows, parsed['columns'])
+
+            # Apply ORDER BY
+            if parsed['order_by']:
+                rows = self._apply_order_by(rows, parsed['order_by'])
         
         # Apply LIMIT
         if parsed['limit']:
@@ -333,24 +487,30 @@ class QueryEngine:
             join_table = join['table']
             join_type = join['type']
             join_condition = join['on']
-            
-            # Get join table rows
-            join_rows = self.storage.select_rows(join_table)
-            join_rows = [self._prefix_columns(row, join_table) for row in join_rows]
-            
-            # Perform join
+
+            # Choose join strategy
             if join_type == JoinType.INNER:
-                result_rows = self._inner_join(result_rows, join_rows, join_condition)
+                result_rows = self._inner_join_index_aware(result_rows, join_table, join_condition)
             elif join_type == JoinType.LEFT:
-                result_rows = self._left_join(result_rows, join_rows, join_condition)
+                result_rows = self._left_join_index_aware(result_rows, join_table, join_condition)
         
-        # Apply column selection
-        if parsed['columns'] != ['*']:
-            result_rows = self._select_columns(result_rows, parsed['columns'])
-        
-        # Apply ORDER BY
-        if parsed['order_by']:
+        # Earlier projection before sorting (keep ORDER BY column if needed)
+        if parsed['columns'] != ['*'] and parsed['order_by']:
+            requested = parsed['columns']
+            order_col = parsed['order_by'].strip().split()[0]
+            needed = list(dict.fromkeys(requested + [order_col]))
+            result_rows = self._select_columns(result_rows, needed)
             result_rows = self._apply_order_by(result_rows, parsed['order_by'])
+            if needed != requested:
+                result_rows = self._select_columns(result_rows, requested)
+        else:
+            # Apply column selection
+            if parsed['columns'] != ['*']:
+                result_rows = self._select_columns(result_rows, parsed['columns'])
+
+            # Apply ORDER BY
+            if parsed['order_by']:
+                result_rows = self._apply_order_by(result_rows, parsed['order_by'])
         
         # Apply LIMIT
         if parsed['limit']:
@@ -361,6 +521,75 @@ class QueryEngine:
             'rows': result_rows,
             'count': len(result_rows)
         }    
+
+    def _inner_join_index_aware(self, left_rows: List[Dict], right_table: str, condition: Dict) -> List[Dict]:
+        """Perform INNER JOIN, using an index on the right table when available."""
+        left_col = condition['left']
+        right_col_qualified = condition['right']
+        right_col = self._unqualify_column(right_col_qualified) or right_col_qualified
+
+        right_rows_raw = self.storage.data.get(right_table, [])
+        right_by_id = {r.get('_row_id'): r for r in right_rows_raw}
+
+        index_mgr = self.storage.indexes.get(right_table)
+        use_index = bool(index_mgr and index_mgr.has_index(right_col))
+
+        result: List[Dict] = []
+        if use_index:
+            index = index_mgr.get_index(right_col)
+            for left_row in left_rows:
+                key = left_row.get(left_col)
+                if key is None:
+                    continue
+                row_ids = index.search(key)
+                for row_id in row_ids:
+                    raw = right_by_id.get(row_id)
+                    if not raw:
+                        continue
+                    clean = {k: v for k, v in raw.items() if k != '_row_id'}
+                    merged = {**left_row, **self._prefix_columns(clean, right_table)}
+                    result.append(merged)
+            return result
+
+        # Fallback: nested-loop join
+        right_rows = [self._prefix_columns(row, right_table) for row in self.storage.select_rows(right_table)]
+        return self._inner_join(left_rows, right_rows, condition)
+
+    def _left_join_index_aware(self, left_rows: List[Dict], right_table: str, condition: Dict) -> List[Dict]:
+        """Perform LEFT JOIN, using an index on the right table when available."""
+        left_col = condition['left']
+        right_col_qualified = condition['right']
+        right_col = self._unqualify_column(right_col_qualified) or right_col_qualified
+
+        right_rows_raw = self.storage.data.get(right_table, [])
+        right_by_id = {r.get('_row_id'): r for r in right_rows_raw}
+
+        index_mgr = self.storage.indexes.get(right_table)
+        use_index = bool(index_mgr and index_mgr.has_index(right_col))
+
+        result: List[Dict] = []
+        if use_index:
+            index = index_mgr.get_index(right_col)
+            for left_row in left_rows:
+                key = left_row.get(left_col)
+                matched_any = False
+                if key is not None:
+                    row_ids = index.search(key)
+                    for row_id in row_ids:
+                        raw = right_by_id.get(row_id)
+                        if not raw:
+                            continue
+                        clean = {k: v for k, v in raw.items() if k != '_row_id'}
+                        merged = {**left_row, **self._prefix_columns(clean, right_table)}
+                        result.append(merged)
+                        matched_any = True
+                if not matched_any:
+                    result.append(left_row)
+            return result
+
+        # Fallback: nested-loop join
+        right_rows = [self._prefix_columns(row, right_table) for row in self.storage.select_rows(right_table)]
+        return self._left_join(left_rows, right_rows, condition)
     def _execute_select_with_aggregates(self, parsed: Dict[str, Any]) -> Dict[str, Any]:
         """
         Execute SELECT with aggregate functions and GROUP BY.
@@ -635,15 +864,16 @@ class QueryEngine:
     def _execute_create_index(self, parsed: Dict[str, Any]) -> Dict[str, Any]:
         """Execute CREATE INDEX"""
         table_name = parsed['table']
-        column_name = parsed['column']
+        columns = parsed.get('columns') or []
+        index_name = parsed.get('index_name')
         
         if not self.storage.get_table(table_name):
             return {'success': False, 'error': f"Table {table_name} does not exist"}
-        
-        self.storage.create_index(table_name, column_name)
+
+        self.storage.create_index(table_name, columns, index_name=index_name)
         
         return {
             'success': True,
-            'message': f"Index created on {table_name}.{column_name}",
+            'message': f"Index '{index_name}' created on {table_name}({', '.join(columns)})",
             'rows_affected': 0
         }

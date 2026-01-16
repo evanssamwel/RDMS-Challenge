@@ -424,7 +424,7 @@ python -m pytest -q
 
 - **Indexed Lookups**: O(log n) with B-tree indexing
 - **Full Table Scans**: O(n) for non-indexed queries
-- **JOINs**: O(n*m) nested loop implementation
+- **JOINs**: Nested loop fallback O(n*m); index-aware joins use right-side B-tree when available
 - **Storage**: JSON format (readable, but not space-efficient)
 
 ## 🎯 Design Decisions
@@ -558,6 +558,5 @@ E. Samwel
 
 This project is open source and available for educational purposes.
 
----
 
 **Note**: This is a demonstration project built for a coding challenge. While it implements core RDBMS concepts, it's not intended for production use. For production databases, consider established systems like PostgreSQL, MySQL, or SQLite.

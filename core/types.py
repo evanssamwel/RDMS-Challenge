@@ -74,9 +74,19 @@ class Column:
         created_at: Timestamp when column was defined
     """
     
-    def __init__(self, name: str, data_type: DataType, length: Optional[int] = None,
-                 primary_key: bool = False, unique: bool = False, not_null: bool = False,
-                 foreign_key: Optional[tuple] = None):
+    def __init__(
+        self,
+        name: str,
+        data_type: DataType,
+        length: Optional[int] = None,
+        primary_key: bool = False,
+        unique: bool = False,
+        not_null: bool = False,
+        foreign_key: Optional[tuple] = None,
+        foreign_key_on_delete: Optional[str] = None,
+        generated_expr: Optional[str] = None,
+        generated_virtual: bool = False,
+    ):
         """
         Initialize a column definition.
         
@@ -104,6 +114,26 @@ class Column:
         # Primary keys are always NOT NULL
         self.not_null = not_null or primary_key
         self.foreign_key = foreign_key
+        self.foreign_key_on_delete = (foreign_key_on_delete or 'RESTRICT').upper() if foreign_key else None
+        self.generated_expr = generated_expr
+        self.generated_virtual = bool(generated_virtual)
+
+        if self.generated_expr and not self.generated_virtual:
+            # For now we only support VIRTUAL generated columns.
+            raise ValueError("Only VIRTUAL generated columns are supported")
+
+        if self.generated_expr and self.primary_key:
+            raise ValueError("Generated columns cannot be PRIMARY KEY")
+
+        if self.generated_expr and self.unique:
+            # Keeping this conservative: unique indexes for generated columns could work,
+            # but it needs careful handling with computed values.
+            raise ValueError("Generated columns cannot be UNIQUE")
+
+        if self.foreign_key_on_delete and self.foreign_key_on_delete not in {'RESTRICT', 'CASCADE', 'SET NULL'}:
+            raise ValueError(
+                "Invalid foreign key ON DELETE action. Supported: RESTRICT, CASCADE, SET NULL"
+            )
         
         # Validate constraints
         if length is not None and data_type != DataType.VARCHAR:
@@ -254,9 +284,18 @@ class Column:
             'created_at': self.created_at.isoformat()
         }
         if self.foreign_key:
-            result['foreign_key'] = {
+            fk_dict = {
                 'table': self.foreign_key[0],
-                'column': self.foreign_key[1]
+                'column': self.foreign_key[1],
+            }
+            if self.foreign_key_on_delete:
+                fk_dict['on_delete'] = self.foreign_key_on_delete
+            result['foreign_key'] = fk_dict
+
+        if self.generated_expr:
+            result['generated'] = {
+                'expr': self.generated_expr,
+                'virtual': self.generated_virtual,
             }
         return result
     
@@ -279,9 +318,18 @@ class Column:
             ValueError: If data is invalid
         """
         foreign_key = None
+        foreign_key_on_delete = None
         if 'foreign_key' in data:
             fk = data['foreign_key']
             foreign_key = (fk['table'], fk['column'])
+            foreign_key_on_delete = fk.get('on_delete')
+
+        generated_expr = None
+        generated_virtual = False
+        if 'generated' in data:
+            gen = data['generated'] or {}
+            generated_expr = gen.get('expr')
+            generated_virtual = bool(gen.get('virtual', False))
         
         return Column(
             name=data['name'],
@@ -290,7 +338,10 @@ class Column:
             primary_key=data.get('primary_key', False),
             unique=data.get('unique', False),
             not_null=data.get('not_null', False),
-            foreign_key=foreign_key
+            foreign_key=foreign_key,
+            foreign_key_on_delete=foreign_key_on_delete,
+            generated_expr=generated_expr,
+            generated_virtual=generated_virtual,
         )
     
     def __repr__(self) -> str:
@@ -316,7 +367,13 @@ class Column:
         if self.not_null and not self.primary_key:  # Avoid redundant NOT NULL
             constraints.append("NOT NULL")
         if self.foreign_key:
-            constraints.append(f"REFERENCES {self.foreign_key[0]}({self.foreign_key[1]})")
+            fk_str = f"REFERENCES {self.foreign_key[0]}({self.foreign_key[1]})"
+            if self.foreign_key_on_delete and self.foreign_key_on_delete != 'RESTRICT':
+                fk_str += f" ON DELETE {self.foreign_key_on_delete}"
+            constraints.append(fk_str)
+
+        if self.generated_expr:
+            constraints.append(f"GENERATED ALWAYS AS ({self.generated_expr}) VIRTUAL")
         
         constraint_str = " " + " ".join(constraints) if constraints else ""
         return f"{self.name} {type_str}{constraint_str}"
@@ -325,6 +382,15 @@ class Column:
         """Check if two columns are equal."""
         if not isinstance(other, Column):
             return False
-        return (self.name == other.name and 
-                self.data_type == other.data_type and
-                self.length == other.length)
+        return (
+            self.name == other.name
+            and self.data_type == other.data_type
+            and self.length == other.length
+            and self.primary_key == other.primary_key
+            and self.unique == other.unique
+            and self.not_null == other.not_null
+            and self.foreign_key == other.foreign_key
+            and self.foreign_key_on_delete == other.foreign_key_on_delete
+            and self.generated_expr == other.generated_expr
+            and self.generated_virtual == other.generated_virtual
+        )

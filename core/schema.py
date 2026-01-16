@@ -15,7 +15,57 @@ Table Schema Architecture:
 """
 from typing import List, Dict, Any, Optional
 from datetime import datetime
+import ast
+import operator
 from core.types import Column
+
+
+_BIN_OPS = {
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.Div: operator.truediv,
+    ast.Mod: operator.mod,
+}
+
+_UNARY_OPS = {
+    ast.UAdd: operator.pos,
+    ast.USub: operator.neg,
+}
+
+
+def _safe_eval_expr(expr: str, env: Dict[str, Any]) -> Any:
+    """Safely evaluate a limited expression for generated columns.
+
+    Supported:
+    - constants (numbers, strings, booleans, NULL as None isn't supported directly)
+    - column references by name
+    - arithmetic + - * / %
+    - unary + -
+
+    Disallowed:
+    - function calls, attribute access, subscripts, comprehensions, etc.
+    """
+    tree = ast.parse(expr, mode='eval')
+
+    def _eval(node):
+        if isinstance(node, ast.Expression):
+            return _eval(node.body)
+        if isinstance(node, ast.Constant):
+            return node.value
+        if isinstance(node, ast.Name):
+            if node.id not in env:
+                raise KeyError(node.id)
+            return env[node.id]
+        if isinstance(node, ast.BinOp) and type(node.op) in _BIN_OPS:
+            left = _eval(node.left)
+            right = _eval(node.right)
+            return _BIN_OPS[type(node.op)](left, right)
+        if isinstance(node, ast.UnaryOp) and type(node.op) in _UNARY_OPS:
+            return _UNARY_OPS[type(node.op)](_eval(node.operand))
+        raise ValueError("Unsupported expression in generated column")
+
+    return _eval(tree)
 
 
 class Table:
@@ -108,20 +158,50 @@ class Table:
             This is a schema-level validation only.
             Uniqueness constraint checking is done at storage level.
         """
-        validated = {}
-        
-        # Validate and convert all columns
+        validated: Dict[str, Any] = {}
+
+        # First pass: validate and convert non-generated columns
         for column in self.columns:
+            if column.generated_expr:
+                continue
             value = row.get(column.name)
-            
-            # Convert and validate based on column type
             try:
                 validated[column.name] = column.convert(value)
             except (ValueError, TypeError) as e:
                 raise ValueError(
                     f"Validation error in column '{column.name}': {str(e)}"
                 )
-        
+
+        # Second pass: compute generated columns (allow dependencies)
+        pending = [c for c in self.columns if c.generated_expr]
+        for _ in range(len(pending) + 1):
+            if not pending:
+                break
+            progressed = False
+            for column in list(pending):
+                try:
+                    computed = _safe_eval_expr(column.generated_expr or "", validated)
+                except KeyError:
+                    continue
+                except Exception as e:
+                    raise ValueError(
+                        f"Validation error in column '{column.name}': {str(e)}"
+                    )
+
+                try:
+                    validated[column.name] = column.convert(computed)
+                except (ValueError, TypeError) as e:
+                    raise ValueError(
+                        f"Validation error in column '{column.name}': {str(e)}"
+                    )
+
+                pending.remove(column)
+                progressed = True
+
+            if not progressed and pending:
+                deps = ", ".join(c.name for c in pending)
+                raise ValueError(f"Cannot compute generated column(s): {deps}")
+
         return validated
     
     def get_column(self, name: str) -> Optional[Column]:
